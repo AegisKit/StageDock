@@ -7,6 +7,7 @@ type CreatorRow = {
   display_name: string;
   notify_enabled: number;
   created_at: string;
+  tags: string;
 };
 
 type LiveStatusRow = {
@@ -34,13 +35,26 @@ type SettingRow = {
 };
 
 export function mapCreatorRow(row: CreatorRow) {
+  let tags: string[] = [];
+  if (row.tags) {
+    try {
+      const parsed = JSON.parse(row.tags);
+      if (Array.isArray(parsed)) {
+        tags = parsed.filter((tag): tag is string => typeof tag === 'string');
+      }
+    } catch {
+      tags = [];
+    }
+  }
+
   return creatorSchema.parse({
     id: row.id,
     platform: row.platform,
     channelId: row.channel_id,
     displayName: row.display_name,
     notifyEnabled: Boolean(row.notify_enabled),
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    tags
   });
 }
 

@@ -8,7 +8,8 @@ export const creatorSchema = z.object({
   channelId: z.string().min(1),
   displayName: z.string().min(1),
   notifyEnabled: z.boolean(),
-  createdAt: z.string().datetime()
+  createdAt: z.string().datetime(),
+  tags: z.array(z.string())
 });
 
 export const creatorInsertSchema = creatorSchema
@@ -16,7 +17,8 @@ export const creatorInsertSchema = creatorSchema
   .extend({
     id: z.string().uuid().optional(),
     createdAt: z.string().datetime().optional(),
-    notifyEnabled: z.boolean().optional().default(true)
+    notifyEnabled: z.boolean().optional().default(true),
+    tags: z.array(z.string()).optional().default([])
   })
   .strict();
 
