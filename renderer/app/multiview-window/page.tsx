@@ -70,9 +70,13 @@ type MoveStart = {
   containerHeight: number;
 };
 
+type StreamVisibilityMap = Record<string, boolean>;
+type ZOrder = string[];
+
 const MIN_WIDTH = 160;
 const MIN_HEIGHT = 140;
 const HEADER_HEIGHT = 32;
+const Z_INDEX_BASE = 200;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -95,6 +99,10 @@ export default function MultiviewWindowPage() {
   const [streamPositions, setStreamPositions] = useState<
     Record<string, StreamPosition>
   >({});
+  const [streamVisibility, setStreamVisibility] = useState<StreamVisibilityMap>(
+    {}
+  );
+  const [zOrder, setZOrder] = useState<ZOrder>([]);
   const [pointerState, setPointerState] = useState<PointerState | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -188,6 +196,8 @@ export default function MultiviewWindowPage() {
     if (!urls.length) {
       setStreamSizes({});
       setStreamPositions({});
+      setStreamVisibility({});
+      setZOrder([]);
       return;
     }
 
@@ -252,6 +262,41 @@ export default function MultiviewWindowPage() {
 
       return changed ? next : prev;
     });
+
+    setStreamVisibility((prev) => {
+      const next: StreamVisibilityMap = { ...prev };
+      let changed = false;
+
+      urls.forEach((url) => {
+        if (typeof next[url] === "undefined") {
+          next[url] = true;
+          changed = true;
+        }
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!urls.includes(key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    setZOrder((prev) => {
+      const next = prev.filter((url) => urls.includes(url));
+      let changed = next.length !== prev.length;
+
+      urls.forEach((url) => {
+        if (!next.includes(url)) {
+          next.push(url);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
   }, [data]);
 
   const finishPointer = useCallback(() => {
@@ -282,10 +327,7 @@ export default function MultiviewWindowPage() {
         const deltaX = event.clientX - start.x;
         const deltaY = event.clientY - start.y;
 
-        const maxWidth = Math.max(
-          MIN_WIDTH,
-          start.containerWidth - start.left
-        );
+        const maxWidth = Math.max(MIN_WIDTH, start.containerWidth - start.left);
         const maxHeight = Math.max(
           MIN_HEIGHT,
           start.containerHeight - start.top
@@ -321,11 +363,10 @@ export default function MultiviewWindowPage() {
         return;
       }
 
-      const size =
-        streamSizesRef.current[pointer.url] || {
-          width: MIN_WIDTH,
-          height: MIN_HEIGHT,
-        };
+      const size = streamSizesRef.current[pointer.url] || {
+        width: MIN_WIDTH,
+        height: MIN_HEIGHT,
+      };
 
       const maxLeft = Math.max(0, start.containerWidth - size.width);
       const maxTop = Math.max(0, start.containerHeight - size.height);
@@ -371,6 +412,36 @@ export default function MultiviewWindowPage() {
     };
   }, [pointerState, handlePointerMove, handlePointerUp]);
 
+  const bringToFront = useCallback((url: string) => {
+    setZOrder((prev) => {
+      const next = prev.filter((entry) => entry !== url);
+      next.push(url);
+      return next;
+    });
+  }, []);
+
+  const sendToBack = useCallback((url: string) => {
+    setZOrder((prev) => {
+      const next = prev.filter((entry) => entry !== url);
+      next.unshift(url);
+      return next;
+    });
+  }, []);
+
+  const toggleStreamVisibility = useCallback((url: string) => {
+    setStreamVisibility((prev) => {
+      const next = { ...prev };
+      const current = next[url] ?? true;
+      next[url] = !current;
+      return next;
+    });
+  }, []);
+
+  const handleHeaderActionMouseDown = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+  }, []);
+
   const startResize = (event: React.MouseEvent, url: string) => {
     if (event.button !== 0) {
       return;
@@ -379,8 +450,10 @@ export default function MultiviewWindowPage() {
     event.preventDefault();
     event.stopPropagation();
 
-    const size =
-      streamSizesRef.current[url] || { width: MIN_WIDTH, height: MIN_HEIGHT };
+    const size = streamSizesRef.current[url] || {
+      width: MIN_WIDTH,
+      height: MIN_HEIGHT,
+    };
     const position = streamPositions[url] || { left: 0, top: 0 };
     const containerRect = containerRef.current?.getBoundingClientRect();
 
@@ -396,6 +469,11 @@ export default function MultiviewWindowPage() {
       containerWidth: containerRect?.width ?? window.innerWidth,
       containerHeight: containerRect?.height ?? window.innerHeight,
     };
+    setZOrder((prev) => {
+      const next = prev.filter((entry) => entry !== url);
+      next.push(url);
+      return next;
+    });
     setPointerState(nextPointer);
   };
 
@@ -418,6 +496,11 @@ export default function MultiviewWindowPage() {
       containerWidth: containerRect?.width ?? window.innerWidth,
       containerHeight: containerRect?.height ?? window.innerHeight,
     };
+    setZOrder((prev) => {
+      const next = prev.filter((entry) => entry !== url);
+      next.push(url);
+      return next;
+    });
     setPointerState(nextPointer);
   };
 
@@ -452,21 +535,32 @@ export default function MultiviewWindowPage() {
       <div className="multiview-content" ref={containerRef}>
         <div className="streams-container">
           {urls.map((url, index) => {
-            const size =
-              streamSizes[url] || { width: MIN_WIDTH, height: MIN_HEIGHT };
+            const size = streamSizes[url] || {
+              width: MIN_WIDTH,
+              height: MIN_HEIGHT,
+            };
             const position = streamPositions[url] || { left: 0, top: 0 };
             const displayName = getDisplayName(url, `Stream ${index + 1}`);
             const isActive = pointerState?.url === url;
+            const isVisible = streamVisibility[url] !== false;
+            const layerIndex = zOrder.length ? zOrder.indexOf(url) : -1;
+            const zIndex =
+              layerIndex === -1
+                ? Z_INDEX_BASE + index
+                : Z_INDEX_BASE + layerIndex;
 
             return (
               <div
                 key={`${url}-${index}`}
-                className={`stream-item ${isActive ? "active" : ""}`}
+                className={`stream-item ${isActive ? "active" : ""} ${
+                  isVisible ? "" : "hidden"
+                }`}
                 style={{
                   width: `${size.width}px`,
                   height: `${size.height}px`,
                   left: `${position.left}px`,
                   top: `${position.top}px`,
+                  zIndex,
                 }}
               >
                 <div
@@ -474,8 +568,55 @@ export default function MultiviewWindowPage() {
                   onMouseDown={(event) => startMove(event, url)}
                 >
                   <span className="stream-title">{displayName}</span>
+                  <div className="stream-header-actions">
+                    <button
+                      type="button"
+                      className="stream-header-button"
+                      title={isVisible ? "Hide stream" : "Show stream"}
+                      aria-label={isVisible ? "Hide stream" : "Show stream"}
+                      aria-pressed={!isVisible}
+                      onMouseDown={handleHeaderActionMouseDown}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleStreamVisibility(url);
+                      }}
+                    >
+                      {isVisible ? "👁" : "🙈"}
+                    </button>
+                    <button
+                      type="button"
+                      className="stream-header-button"
+                      title="Bring to front"
+                      aria-label="Bring to front"
+                      onMouseDown={handleHeaderActionMouseDown}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        bringToFront(url);
+                      }}
+                    >
+                      ⬆
+                    </button>
+                    <button
+                      type="button"
+                      className="stream-header-button"
+                      title="Send to back"
+                      aria-label="Send to back"
+                      onMouseDown={handleHeaderActionMouseDown}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        sendToBack(url);
+                      }}
+                    >
+                      ⬇
+                    </button>
+                  </div>
                 </div>
                 <div className="stream-player">
+                  {!isVisible && (
+                    <div className="stream-hidden-overlay">
+                      Hidden - audio only
+                    </div>
+                  )}
                   <iframe
                     src={convertToEmbedUrl(url)}
                     allow="autoplay; encrypted-media; picture-in-picture"
@@ -625,10 +766,20 @@ export default function MultiviewWindowPage() {
           box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
         }
 
+        .stream-item.hidden {
+          box-shadow: 0 0 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .stream-item.hidden .stream-header {
+          background: rgba(24, 24, 32, 0.7);
+        }
+
         .stream-header {
           flex: 0 0 ${HEADER_HEIGHT}px;
           display: flex;
           align-items: center;
+          justify-content: space-between;
+          gap: 12px;
           padding: 0 12px;
           background: rgba(16, 16, 24, 0.8);
           backdrop-filter: blur(6px);
@@ -642,10 +793,39 @@ export default function MultiviewWindowPage() {
           background: rgba(24, 24, 32, 0.9);
         }
 
+        .stream-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .stream-header-button {
+          background: transparent;
+          border: none;
+          color: #d4d4dc;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .stream-header-button:hover,
+        .stream-header-button:focus-visible {
+          background: rgba(255, 255, 255, 0.12);
+          color: #ffffff;
+        }
+
+        .stream-header-button:focus-visible {
+          outline: 2px solid #8aa4ff;
+          outline-offset: 2px;
+        }
+
         .stream-title {
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
+          flex: 1;
         }
 
         .stream-player {
@@ -654,11 +834,34 @@ export default function MultiviewWindowPage() {
           background: #000000;
         }
 
+        .stream-item.hidden .stream-player {
+          pointer-events: none;
+        }
+
         .stream-iframe {
           width: 100%;
           height: 100%;
           border: none;
           background: #000000;
+          transition: opacity 0.2s ease;
+        }
+
+        .stream-item.hidden .stream-iframe {
+          opacity: 0;
+        }
+
+        .stream-hidden-overlay {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          color: #f0f0f5;
+          background: rgba(16, 16, 24, 0.85);
+          pointer-events: none;
+          text-align: center;
+          padding: 8px;
         }
 
         .resize-handle {
