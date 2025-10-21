@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent, JSX } from "react";
 import type {
   CreatorPlatform,
   CreatorWithStatus,
@@ -55,7 +55,6 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
     </svg>
   ),
 };
-
 
 const DEFAULT_FORM_STATE = {
   platform: "twitch" as CreatorPlatform,
@@ -168,7 +167,10 @@ export default function FavoritesPage() {
 
   const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>([]);
   const selectedOnlineCreators = useMemo(
-    () => onlineCreators.filter((creator) => selectedCreatorIds.includes(creator.id)),
+    () =>
+      onlineCreators.filter((creator) =>
+        selectedCreatorIds.includes(creator.id)
+      ),
     [onlineCreators, selectedCreatorIds]
   );
 
@@ -229,18 +231,24 @@ export default function FavoritesPage() {
     let statusByCreator: Map<string, LiveStatus> | null = null;
     try {
       const statuses = await getStageDock().liveStatus.list();
-      statusByCreator = new Map(statuses.map((status) => [status.creatorId, status]));
+      statusByCreator = new Map(
+        statuses.map((status) => [status.creatorId, status])
+      );
     } catch (error) {
-      console.error("Failed to refresh live status before opening multi-view:", error);
+      console.error(
+        "Failed to refresh live status before opening multi-view:",
+        error
+      );
     }
 
     const urls = Array.from(
       new Set(
         selectedOnlineCreators
-          .map((creator) =>
-            statusByCreator?.get(creator.id)?.streamUrl ??
-            creator.liveStatus?.streamUrl ??
-            buildStreamUrl(creator)
+          .map(
+            (creator) =>
+              statusByCreator?.get(creator.id)?.streamUrl ??
+              creator.liveStatus?.streamUrl ??
+              buildStreamUrl(creator)
           )
           .filter((url): url is string => Boolean(url))
       )
@@ -294,7 +302,6 @@ export default function FavoritesPage() {
 
   if (!ready) {
     return (
-
       <div className="section">
         <div className="panel">
           <p className="misc-note">
@@ -306,7 +313,6 @@ export default function FavoritesPage() {
   }
 
   return (
-
     <div className="section favorites-page" role="region">
       <div className="section-heading">
         <h1 className="section-title">Favorites</h1>
@@ -430,15 +436,18 @@ export default function FavoritesPage() {
             disabled={!ready || selectedOnlineCreators.length === 0}
             style={{ whiteSpace: "nowrap" }}
           >
-            {selectedOnlineCreators.length > 0 ? `Open Selected (${selectedOnlineCreators.length})` : "Open Selected"} in Multi-view
+            {selectedOnlineCreators.length > 0
+              ? `Open Selected (${selectedOnlineCreators.length})`
+              : "Open Selected"}{" "}
+            in Multi-view
           </button>
         </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
-                <tr>
-                  <th>Select</th>
-                  <th>Display name</th>
+              <tr>
+                <th>Select</th>
+                <th>Display name</th>
                 <th>Platform</th>
                 <th>Channel ID</th>
                 <th>Notification</th>
@@ -466,16 +475,24 @@ export default function FavoritesPage() {
                       />
                     </td>
                     <td>{creator.displayName}</td>
-                    <td><span role="img" aria-label={PLATFORM_LABELS[creator.platform]} title={PLATFORM_LABELS[creator.platform]}>{PLATFORM_ICONS[creator.platform]}</span></td>
+                    <td>
+                      <span
+                        role="img"
+                        aria-label={PLATFORM_LABELS[creator.platform]}
+                        title={PLATFORM_LABELS[creator.platform]}
+                      >
+                        {PLATFORM_ICONS[creator.platform]}
+                      </span>
+                    </td>
                     <td>{creator.channelId}</td>
                     <td>
                       <button
                         type="button"
-                        className={`notify-toggle ${creator.notifyEnabled ? "is-on" : "is-off"}`}
+                        className={`notify-toggle ${
+                          creator.notifyEnabled ? "is-on" : "is-off"
+                        }`}
                         onClick={() => handleNotifyToggle(creator)}
-                      >
-                        
-                      </button>
+                      ></button>
                     </td>
                     <td>
                       {creator.liveStatus?.isLive ? (
@@ -503,8 +520,3 @@ export default function FavoritesPage() {
     </div>
   );
 }
-
-
-
-
-

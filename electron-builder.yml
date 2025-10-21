@@ -3,7 +3,6 @@ productName: StageDock
 directories:
   output: dist/electron
   buildResources: build
-icon: assets/icon.ico
 files:
   - dist/main/**
   - dist/preload/**
