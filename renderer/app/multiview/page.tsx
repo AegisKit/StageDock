@@ -1,43 +1,19 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { UrlSet } from "../../../src/common/types.js";
-import {
-  useDeleteUrlSet,
-  useSaveUrlSet,
-  useTouchUrlSet,
-  useUrlSets,
-} from "../../hooks/use-url-sets";
 import { getStageDock } from "../../lib/stagedock";
 
 function normalizeUrls(input: string) {
   return input
     .split(/\r?\n/)
     .map((value) => value.trim())
-    .filter(
-      (value, index, self) => value.length > 0 && self.indexOf(value) === index
-    );
-}
-
-function formatSetLabel(set: UrlSet) {
-  const count = set.urls.length;
-  const formatted = new Date(set.lastUsedAt ?? set.createdAt).toLocaleString(
-    "en-US",
-    {
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
-  return `${set.name} (${count} urls - ${formatted})`;
+    .filter((value, index, self) => value.length > 0 && self.indexOf(value) === index);
 }
 
 function convertToEmbedUrl(url: string): string {
   try {
     const urlObj = new URL(url);
 
-    // YouTube
     if (
       urlObj.hostname.includes("youtube.com") ||
       urlObj.hostname.includes("youtu.be")
@@ -55,7 +31,6 @@ function convertToEmbedUrl(url: string): string {
       }
     }
 
-    // Twitch
     if (urlObj.hostname.includes("twitch.tv")) {
       const pathParts = urlObj.pathname.split("/").filter(Boolean);
       if (pathParts.length > 0) {
@@ -64,7 +39,6 @@ function convertToEmbedUrl(url: string): string {
       }
     }
 
-    // その他の場合は元のURLを返す
     return url;
   } catch (error) {
     console.error("Error converting URL to embed:", error);
@@ -73,15 +47,9 @@ function convertToEmbedUrl(url: string): string {
 }
 
 export default function MultiViewPage() {
-  const { data: urlSets = [], isLoading, refetch } = useUrlSets();
-  const saveMutation = useSaveUrlSet();
-  const deleteMutation = useDeleteUrlSet();
-  const touchMutation = useTouchUrlSet();
-
   const [urlsInput, setUrlsInput] = useState("");
   const [streams, setStreams] = useState<string[]>([]);
   const [activeStream, setActiveStream] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const parsedUrls = useMemo(() => normalizeUrls(urlsInput), [urlsInput]);
 
@@ -113,53 +81,17 @@ export default function MultiViewPage() {
     [activeStream]
   );
 
-  const handleSaveSet = useCallback(async () => {
-    const urls = normalizeUrls(urlsInput);
-    if (urls.length === 0) {
+  const openMultiviewWindow = useCallback(async () => {
+    if (streams.length === 0) {
       return;
     }
-    const name = window.prompt("Name for this URL set");
-    if (!name) {
-      return;
+
+    try {
+      await getStageDock().multiview.open(streams, "2x2");
+    } catch (error) {
+      console.error("Failed to open multiview window:", error);
     }
-    await saveMutation.mutateAsync({ name, urls });
-    void refetch();
-  }, [urlsInput, saveMutation, refetch]);
-
-  const handleLoadSet = useCallback(
-    async (set: UrlSet) => {
-      await touchMutation.mutateAsync(set.id);
-      setStreams(set.urls);
-      setUrlsInput(set.urls.join("\n"));
-      setActiveStream(set.urls[0] ?? null);
-    },
-    [touchMutation]
-  );
-
-  const handleDeleteSet = useCallback(
-    async (set: UrlSet) => {
-      if (!window.confirm(`Delete "${set.name}"?`)) {
-        return;
-      }
-      await deleteMutation.mutateAsync(set.id);
-      void refetch();
-    },
-    [deleteMutation, refetch]
-  );
-
-  const toggleFullscreen = useCallback(async () => {
-    if (!isFullscreen && streams.length > 0) {
-      const urls = streams;
-      try {
-        await getStageDock().multiview.open(urls, "2x2");
-        setIsFullscreen(true);
-      } catch (error) {
-        console.error("Failed to open multiview window:", error);
-      }
-    } else {
-      setIsFullscreen(!isFullscreen);
-    }
-  }, [isFullscreen, streams]);
+  }, [streams]);
 
   useEffect(() => {
     document.dispatchEvent(
@@ -169,7 +101,6 @@ export default function MultiViewPage() {
     );
   }, [streams]);
 
-  // セッションストレージから保留中のURLを読み込む
   useEffect(() => {
     const pendingUrls = JSON.parse(
       sessionStorage.getItem("stagedock-pending-urls") || "[]"
@@ -178,12 +109,10 @@ export default function MultiViewPage() {
       pendingUrls.forEach((url: string) => {
         handleAddStream(url);
       });
-      // 処理後はクリア
       sessionStorage.removeItem("stagedock-pending-urls");
     }
   }, [handleAddStream]);
 
-  // グローバルイベントリスナーを設定
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ url?: string }>).detail;
@@ -206,8 +135,7 @@ export default function MultiViewPage() {
       <div className="section-heading">
         <h1 className="section-title">Multi-view</h1>
         <p className="section-description">
-          Paste one URL per line and StageDock will build layouts for you. Save
-          frequently used sets for instant recall.
+          Paste one URL per line and StageDock will build a tailored multi-view window for you.
         </p>
       </div>
 
@@ -226,24 +154,16 @@ export default function MultiViewPage() {
               className="button button-primary"
               onClick={handleApply}
             >
-              Load Streams
-            </button>
-            <button
-              type="button"
-              className="button button-outline"
-              onClick={handleSaveSet}
-              disabled={parsedUrls.length === 0 || saveMutation.isPending}
-            >
-              {saveMutation.isPending ? "Saving..." : "Save current URLs"}
+              Update Preview
             </button>
             <button
               type="button"
               className="button button-primary"
-              onClick={toggleFullscreen}
+              onClick={openMultiviewWindow}
               disabled={streams.length === 0}
               style={{ backgroundColor: "#4CAF50" }}
             >
-              {isFullscreen ? "Close Fullscreen" : "Fullscreen"}
+              Open Multi-view Window
             </button>
           </div>
           <span className="misc-note">{parsedUrls.length} urls</span>
@@ -251,51 +171,10 @@ export default function MultiViewPage() {
       </div>
 
       <div className="panel">
-        <div
-          className="section-heading"
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <h2 className="section-title-small">Saved sets</h2>
-          <span className="misc-note">
-            {isLoading ? "Loading..." : `${urlSets.length} saved`}
-          </span>
-        </div>
-        <div className="tag-list">
-          {urlSets.map((set) => (
-            <div key={set.id} className="tag">
-              <button
-                type="button"
-                onClick={() => handleLoadSet(set)}
-                className="button button-outline"
-                style={{ padding: "6px 12px", fontSize: 12 }}
-              >
-                {formatSetLabel(set)}
-              </button>
-              <button
-                type="button"
-                className="button button-danger"
-                style={{ padding: "4px 10px", fontSize: 12 }}
-                onClick={() => handleDeleteSet(set)}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          {urlSets.length === 0 && !isLoading && (
-            <p className="misc-note">No saved sets yet.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="panel">
         <h2 className="section-title-small">Preview</h2>
         {streams.length === 0 ? (
           <div className="empty-state">
-            Add URLs and click "Render layout" to see players here.
+            Add URLs and click "Update Preview" to see players here.
           </div>
         ) : (
           <div className="preview-grid">

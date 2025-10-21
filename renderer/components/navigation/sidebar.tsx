@@ -9,7 +9,6 @@ const NAV_LINKS = [
   { href: "/favorites", label: "Favorites" },
   { href: "/live", label: "Live Now" },
   { href: "/multiview", label: "Multi-view" },
-  { href: "/mixer", label: "Audio Mixer" },
   { href: "/settings", label: "Settings" }
 ] as const;
 
