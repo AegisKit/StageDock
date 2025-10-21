@@ -167,6 +167,8 @@ export default function MultiviewWindowPage() {
   };
 
   const handleMouseDown = (e: React.MouseEvent, url: string) => {
+    if (e.button !== 0) return;
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -182,6 +184,11 @@ export default function MultiviewWindowPage() {
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging || !dragStart) return;
+
+    if (e.buttons === 0) {
+      handleMouseUp();
+      return;
+    }
 
     // マウスの移動距離を計算
     const deltaX = e.clientX - dragStart.x;
@@ -209,9 +216,11 @@ export default function MultiviewWindowPage() {
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("blur", handleMouseUp);
       return () => {
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
+        window.removeEventListener("blur", handleMouseUp);
       };
     }
   }, [isDragging, dragStart]);
@@ -230,7 +239,7 @@ export default function MultiviewWindowPage() {
   const { urls } = data;
 
   return (
-    <div className={`multiview-container ${isFullscreen ? "fullscreen" : ""}`}>
+    <div className={`multiview-container ${isFullscreen ? "fullscreen" : ""} ${isDragging ? "dragging" : ""}`}>
       {/* フルスクリーン時のみ表示されるコントロール */}
       {isFullscreen && (
         <div className="fullscreen-controls">
@@ -390,6 +399,10 @@ export default function MultiviewWindowPage() {
 
         .multiview-container.fullscreen .streams-container {
           background: #000000;
+        }
+
+        .multiview-container.dragging .stream-iframe {
+          pointer-events: none;
         }
 
         .stream-player {
