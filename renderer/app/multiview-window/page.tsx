@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface MultiviewData {
   urls: string[];
@@ -11,7 +11,6 @@ function convertToEmbedUrl(url: string): string {
   try {
     const urlObj = new URL(url);
 
-    // YouTube
     if (
       urlObj.hostname.includes("youtube.com") ||
       urlObj.hostname.includes("youtu.be")
@@ -19,7 +18,7 @@ function convertToEmbedUrl(url: string): string {
       let videoId = "";
       if (urlObj.hostname.includes("youtu.be")) {
         videoId = urlObj.pathname.slice(1);
-      } else if (urlObj.hostname.includes("youtube.com")) {
+      } else {
         videoId = urlObj.searchParams.get("v") || "";
       }
       if (videoId) {
@@ -36,7 +35,6 @@ function convertToEmbedUrl(url: string): string {
       }
     }
 
-    // Twitch
     if (urlObj.hostname.includes("twitch.tv")) {
       const pathParts = urlObj.pathname.split("/").filter(Boolean);
       if (pathParts.length > 0) {
@@ -52,62 +50,112 @@ function convertToEmbedUrl(url: string): string {
   }
 }
 
+type StreamSize = { width: number; height: number };
+type StreamPosition = { left: number; top: number };
+type PointerState = { mode: "resize" | "move"; url: string };
+type ResizeStart = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+  containerWidth: number;
+  containerHeight: number;
+};
+type MoveStart = {
+  offsetX: number;
+  offsetY: number;
+  containerWidth: number;
+  containerHeight: number;
+};
+
+const MIN_WIDTH = 160;
+const MIN_HEIGHT = 140;
+const HEADER_HEIGHT = 32;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+function getDisplayName(url: string, fallback: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch (error) {
+    return fallback;
+  }
+}
+
 export default function MultiviewWindowPage() {
   const [data, setData] = useState<MultiviewData | null>(null);
-  const [isDragging, setIsDragging] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [dragStart, setDragStart] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [streamSizes, setStreamSizes] = useState<
-    Record<string, { width: number; height: number }>
+  const [streamSizes, setStreamSizes] = useState<Record<string, StreamSize>>(
+    {}
+  );
+  const [streamPositions, setStreamPositions] = useState<
+    Record<string, StreamPosition>
   >({});
+  const [pointerState, setPointerState] = useState<PointerState | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const streamSizesRef = useRef(streamSizes);
+  const pointerStateRef = useRef<PointerState | null>(null);
+  const resizeStartRef = useRef<ResizeStart | null>(null);
+  const moveStartRef = useRef<MoveStart | null>(null);
 
   useEffect(() => {
-    // メインプロセスからデータを受信
-    const handleMultiviewData = (event: CustomEvent<MultiviewData>) => {
-      setData(event.detail);
+    streamSizesRef.current = streamSizes;
+  }, [streamSizes]);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen({
+          navigationUI: "hide",
+        });
+      }
+    } catch (error) {
+      console.error("Fullscreen toggle failed:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleMultiviewData = (event: Event) => {
+      const detail = (event as CustomEvent<MultiviewData>).detail;
+      setData(detail);
     };
 
-    // カスタムイベントリスナーを追加
     document.addEventListener(
       "multiview:data",
       handleMultiviewData as EventListener
     );
 
-    // IPC通信でデータを受信
     if ((window as any).electronAPI) {
-      (window as any).electronAPI.onMultiviewData((data: MultiviewData) => {
-        setData(data);
+      (window as any).electronAPI.onMultiviewData((payload: MultiviewData) => {
+        setData(payload);
       });
     }
 
-    // フルスクリーン状態の監視
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
 
-    // キーボードショートカット
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (isFullscreen) {
-          // フルスクリーン中の場合はフルスクリーンを終了
-          e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (document.fullscreenElement) {
+          event.preventDefault();
           toggleFullscreen();
         } else {
-          // 通常時はウィンドウを閉じる
           if ((window as any).stagedock) {
             (window as any).stagedock.multiview.close();
           } else {
             window.close();
           }
         }
-      } else if (e.key === "F11") {
-        e.preventDefault();
+      } else if (event.key === "F11") {
+        event.preventDefault();
         toggleFullscreen();
       }
     };
@@ -123,107 +171,255 @@ export default function MultiviewWindowPage() {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
-  }, [isFullscreen]);
+  }, [toggleFullscreen]);
 
-  // データが読み込まれた時に初期サイズを設定
   useEffect(() => {
-    if (data && containerRef.current) {
-      const container = containerRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const { urls } = data;
-
-      // 初期サイズを計算（すべて同じサイズでウィンドウいっぱいに表示）
-      const initialSizes: Record<string, { width: number; height: number }> =
-        {};
-      const cols = Math.ceil(Math.sqrt(urls.length));
-      const rows = Math.ceil(urls.length / cols);
-      const cellWidth = containerRect.width / cols;
-      const cellHeight = containerRect.height / rows;
-
-      urls.forEach((url) => {
-        initialSizes[url] = {
-          width: cellWidth,
-          height: cellHeight,
-        };
-      });
-
-      setStreamSizes(initialSizes);
-    }
-  }, [data]);
-
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        // 真のフルスクリーンモードを要求
-        await document.documentElement.requestFullscreen({
-          navigationUI: "hide", // ナビゲーションUIを非表示
-        });
-      }
-    } catch (error) {
-      console.error("Fullscreen toggle failed:", error);
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent, url: string) => {
-    if (e.button !== 0) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const currentSize = streamSizes[url] || { width: 400, height: 300 };
-    setIsDragging(url);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: currentSize.width,
-      height: currentSize.height,
-    });
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !dragStart) return;
-
-    if (e.buttons === 0) {
-      handleMouseUp();
+    if (!data || !containerRef.current) {
       return;
     }
 
-    // マウスの移動距離を計算
-    const deltaX = e.clientX - dragStart.x;
-    const deltaY = e.clientY - dragStart.y;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return;
+    }
 
-    // 新しいサイズを計算（最小サイズ制限なし、完全に自由）
-    const newWidth = Math.max(50, dragStart.width + deltaX);
-    const newHeight = Math.max(50, dragStart.height + deltaY);
+    const { urls } = data;
 
-    setStreamSizes((prev) => ({
-      ...prev,
-      [isDragging]: {
-        width: newWidth,
-        height: newHeight,
-      },
-    }));
-  };
+    if (!urls.length) {
+      setStreamSizes({});
+      setStreamPositions({});
+      return;
+    }
 
-  const handleMouseUp = () => {
-    setIsDragging(null);
-    setDragStart(null);
-  };
+    const cols = Math.ceil(Math.sqrt(urls.length));
+    const rows = Math.ceil(urls.length / cols);
+
+    const defaultWidth = Math.max(
+      MIN_WIDTH,
+      Math.min(rect.width / cols, rect.width)
+    );
+    const defaultHeight = Math.max(
+      MIN_HEIGHT,
+      Math.min(rect.height / rows, rect.height)
+    );
+
+    setStreamSizes((prev) => {
+      const next: Record<string, StreamSize> = { ...prev };
+      let changed = false;
+
+      urls.forEach((url) => {
+        if (!next[url]) {
+          next[url] = { width: defaultWidth, height: defaultHeight };
+          changed = true;
+        }
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!urls.includes(key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    setStreamPositions((prev) => {
+      const next: Record<string, StreamPosition> = { ...prev };
+      let changed = false;
+
+      urls.forEach((url, index) => {
+        if (!next[url]) {
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          const left = col * defaultWidth;
+          const top = row * defaultHeight;
+
+          next[url] = {
+            left: clamp(left, 0, Math.max(0, rect.width - defaultWidth)),
+            top: clamp(top, 0, Math.max(0, rect.height - defaultHeight)),
+          };
+          changed = true;
+        }
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!urls.includes(key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [data]);
+
+  const finishPointer = useCallback(() => {
+    pointerStateRef.current = null;
+    resizeStartRef.current = null;
+    moveStartRef.current = null;
+    setPointerState(null);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (event: MouseEvent) => {
+      const pointer = pointerStateRef.current;
+      if (!pointer) {
+        return;
+      }
+
+      if (event.buttons === 0) {
+        finishPointer();
+        return;
+      }
+
+      if (pointer.mode === "resize") {
+        const start = resizeStartRef.current;
+        if (!start) {
+          return;
+        }
+
+        const deltaX = event.clientX - start.x;
+        const deltaY = event.clientY - start.y;
+
+        const maxWidth = Math.max(
+          MIN_WIDTH,
+          start.containerWidth - start.left
+        );
+        const maxHeight = Math.max(
+          MIN_HEIGHT,
+          start.containerHeight - start.top
+        );
+
+        const nextWidth = clamp(start.width + deltaX, MIN_WIDTH, maxWidth);
+        const nextHeight = clamp(start.height + deltaY, MIN_HEIGHT, maxHeight);
+
+        setStreamSizes((prev) => {
+          const current = prev[pointer.url];
+          if (
+            current &&
+            current.width === nextWidth &&
+            current.height === nextHeight
+          ) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [pointer.url]: {
+              width: nextWidth,
+              height: nextHeight,
+            },
+          };
+        });
+
+        return;
+      }
+
+      const start = moveStartRef.current;
+      if (!start) {
+        return;
+      }
+
+      const size =
+        streamSizesRef.current[pointer.url] || {
+          width: MIN_WIDTH,
+          height: MIN_HEIGHT,
+        };
+
+      const maxLeft = Math.max(0, start.containerWidth - size.width);
+      const maxTop = Math.max(0, start.containerHeight - size.height);
+
+      const nextLeft = clamp(event.clientX - start.offsetX, 0, maxLeft);
+      const nextTop = clamp(event.clientY - start.offsetY, 0, maxTop);
+
+      setStreamPositions((prev) => {
+        const current = prev[pointer.url];
+        if (current && current.left === nextLeft && current.top === nextTop) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [pointer.url]: {
+            left: nextLeft,
+            top: nextTop,
+          },
+        };
+      });
+    },
+    [finishPointer]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    finishPointer();
+  }, [finishPointer]);
 
   useEffect(() => {
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      window.addEventListener("blur", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        window.removeEventListener("blur", handleMouseUp);
-      };
+    if (!pointerState) {
+      return;
     }
-  }, [isDragging, dragStart]);
+
+    document.addEventListener("mousemove", handlePointerMove);
+    document.addEventListener("mouseup", handlePointerUp);
+    window.addEventListener("blur", handlePointerUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handlePointerMove);
+      document.removeEventListener("mouseup", handlePointerUp);
+      window.removeEventListener("blur", handlePointerUp);
+    };
+  }, [pointerState, handlePointerMove, handlePointerUp]);
+
+  const startResize = (event: React.MouseEvent, url: string) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const size =
+      streamSizesRef.current[url] || { width: MIN_WIDTH, height: MIN_HEIGHT };
+    const position = streamPositions[url] || { left: 0, top: 0 };
+    const containerRect = containerRef.current?.getBoundingClientRect();
+
+    const nextPointer: PointerState = { mode: "resize", url };
+    pointerStateRef.current = nextPointer;
+    resizeStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      width: size.width,
+      height: size.height,
+      left: position.left,
+      top: position.top,
+      containerWidth: containerRect?.width ?? window.innerWidth,
+      containerHeight: containerRect?.height ?? window.innerHeight,
+    };
+    setPointerState(nextPointer);
+  };
+
+  const startMove = (event: React.MouseEvent, url: string) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const position = streamPositions[url] || { left: 0, top: 0 };
+    const containerRect = containerRef.current?.getBoundingClientRect();
+
+    const nextPointer: PointerState = { mode: "move", url };
+    pointerStateRef.current = nextPointer;
+    moveStartRef.current = {
+      offsetX: event.clientX - position.left,
+      offsetY: event.clientY - position.top,
+      containerWidth: containerRect?.width ?? window.innerWidth,
+      containerHeight: containerRect?.height ?? window.innerHeight,
+    };
+    setPointerState(nextPointer);
+  };
 
   if (!data) {
     return (
@@ -237,14 +433,18 @@ export default function MultiviewWindowPage() {
   }
 
   const { urls } = data;
+  const pointerLocked = Boolean(pointerState);
 
   return (
-    <div className={`multiview-container ${isFullscreen ? "fullscreen" : ""} ${isDragging ? "dragging" : ""}`}>
-      {/* フルスクリーン時のみ表示されるコントロール */}
+    <div
+      className={`multiview-container ${isFullscreen ? "fullscreen" : ""} ${
+        pointerLocked ? "pointer-locked" : ""
+      }`}
+    >
       {isFullscreen && (
         <div className="fullscreen-controls">
           <div className="fullscreen-info">
-            <span>フルスクリーンモード - ESCキーで終了</span>
+            <span>Fullscreen mode - press ESC to exit</span>
           </div>
         </div>
       )}
@@ -252,21 +452,32 @@ export default function MultiviewWindowPage() {
       <div className="multiview-content" ref={containerRef}>
         <div className="streams-container">
           {urls.map((url, index) => {
-            const embedUrl = convertToEmbedUrl(url);
-            const size = streamSizes[url] || { width: 400, height: 300 };
+            const size =
+              streamSizes[url] || { width: MIN_WIDTH, height: MIN_HEIGHT };
+            const position = streamPositions[url] || { left: 0, top: 0 };
+            const displayName = getDisplayName(url, `Stream ${index + 1}`);
+            const isActive = pointerState?.url === url;
 
             return (
               <div
-                key={`stream-${index}`}
-                className="stream-item"
+                key={`${url}-${index}`}
+                className={`stream-item ${isActive ? "active" : ""}`}
                 style={{
                   width: `${size.width}px`,
                   height: `${size.height}px`,
+                  left: `${position.left}px`,
+                  top: `${position.top}px`,
                 }}
               >
+                <div
+                  className="stream-header"
+                  onMouseDown={(event) => startMove(event, url)}
+                >
+                  <span className="stream-title">{displayName}</span>
+                </div>
                 <div className="stream-player">
                   <iframe
-                    src={embedUrl}
+                    src={convertToEmbedUrl(url)}
                     allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
                     title={url}
@@ -275,7 +486,7 @@ export default function MultiviewWindowPage() {
                 </div>
                 <div
                   className="resize-handle"
-                  onMouseDown={(e) => handleMouseDown(e, url)}
+                  onMouseDown={(event) => startResize(event, url)}
                 />
               </div>
             );
@@ -331,15 +542,12 @@ export default function MultiviewWindowPage() {
         .streams-container {
           width: 100%;
           height: 100%;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 2px;
-          align-content: flex-start;
           position: relative;
           overflow: auto;
+          padding: 8px;
+          box-sizing: border-box;
         }
 
-        /* フルスクリーン時の制約を修正 */
         .multiview-container:fullscreen {
           width: 100vw !important;
           height: 100vh !important;
@@ -361,11 +569,6 @@ export default function MultiviewWindowPage() {
           max-height: 100vh !important;
         }
 
-        .multiview-container:fullscreen .stream-item {
-          position: relative;
-        }
-
-        /* フルスクリーン時のコントロール */
         .fullscreen-controls {
           position: fixed;
           top: 0;
@@ -392,7 +595,6 @@ export default function MultiviewWindowPage() {
           gap: 8px;
         }
 
-        /* フルスクリーン時の追加スタイル */
         .multiview-container.fullscreen {
           background: #000000;
         }
@@ -401,21 +603,62 @@ export default function MultiviewWindowPage() {
           background: #000000;
         }
 
-        .multiview-container.dragging .stream-iframe {
+        .multiview-container.pointer-locked .stream-iframe {
           pointer-events: none;
         }
 
+        .stream-item {
+          position: absolute;
+          display: flex;
+          flex-direction: column;
+          background: #1a1a1f;
+          border: 1px solid #2a2a2f;
+          border-radius: 6px;
+          overflow: hidden;
+          min-width: ${MIN_WIDTH}px;
+          min-height: ${MIN_HEIGHT}px;
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+          transition: box-shadow 0.2s ease;
+        }
+
+        .stream-item.active {
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .stream-header {
+          flex: 0 0 ${HEADER_HEIGHT}px;
+          display: flex;
+          align-items: center;
+          padding: 0 12px;
+          background: rgba(16, 16, 24, 0.8);
+          backdrop-filter: blur(6px);
+          font-size: 12px;
+          letter-spacing: 0.4px;
+          cursor: move;
+          user-select: none;
+        }
+
+        .stream-header:hover {
+          background: rgba(24, 24, 32, 0.9);
+        }
+
+        .stream-title {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+
         .stream-player {
-          width: 100%;
-          height: 100%;
           position: relative;
+          flex: 1;
+          background: #000000;
         }
 
         .stream-iframe {
           width: 100%;
           height: 100%;
           border: none;
-          background: #000;
+          background: #000000;
         }
 
         .resize-handle {
@@ -455,21 +698,11 @@ export default function MultiviewWindowPage() {
             #5a5a5f 70%,
             transparent 70%
           );
-          transform: scale(1.1);
+          transform: scale(1.08);
         }
 
         .stream-item:hover .resize-handle {
           opacity: 1;
-        }
-
-        .stream-item {
-          background: #1a1a1f;
-          border: 1px solid #2a2a2f;
-          overflow: hidden;
-          position: relative;
-          min-width: 50px;
-          min-height: 50px;
-          flex-shrink: 0;
         }
       `}</style>
     </div>
