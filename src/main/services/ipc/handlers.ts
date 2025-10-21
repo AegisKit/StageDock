@@ -11,6 +11,7 @@ import {
   urlSetInsertSchema,
 } from "../../database/schema.js";
 import { logger } from "../../utils/logger.js";
+import { refreshLiveStatusNow } from "../live-monitor.js";
 
 const creatorUpdateSchema = z.object({
   id: z.string().uuid(),
@@ -18,6 +19,10 @@ const creatorUpdateSchema = z.object({
   channelId: z.string().min(1).optional(),
   notifyEnabled: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
+});
+
+const creatorRefreshSchema = z.object({
+  id: z.string().uuid(),
 });
 
 const deleteByIdSchema = z.object({
@@ -66,6 +71,14 @@ export function registerIpcHandlers(database: StageDockDatabase): void {
       tags: input.tags,
     });
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.CREATORS_REFRESH_STATUS,
+    async (_event, rawInput) => {
+      const { id } = creatorRefreshSchema.parse(rawInput);
+      return refreshLiveStatusNow(database, id);
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.CREATORS_DELETE, (_event, rawInput) => {
     const { id } = deleteByIdSchema.parse(rawInput);

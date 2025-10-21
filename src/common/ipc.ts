@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
   CREATORS_CREATE: "creators:create",
   CREATORS_UPDATE: "creators:update",
   CREATORS_DELETE: "creators:delete",
+  CREATORS_REFRESH_STATUS: "creators:refresh-status",
   LIVE_STATUS_LIST: "live-status:list",
   LIVE_STATUS_UPSERT: "live-status:upsert",
   URL_SETS_LIST: "url-sets:list",
