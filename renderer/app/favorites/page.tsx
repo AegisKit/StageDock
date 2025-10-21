@@ -24,8 +24,8 @@ const PLATFORM_LABELS: Record<CreatorPlatform, string> = {
 const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
   twitch: (
     <svg
-      width="18"
-      height="18"
+      width="28"
+      height="28"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       focusable="false"
@@ -40,8 +40,8 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
   ),
   youtube: (
     <svg
-      width="18"
-      height="18"
+      width="28"
+      height="28"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       focusable="false"
