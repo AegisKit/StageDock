@@ -3,14 +3,11 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useCreators } from "../hooks/use-creators";
-import { useUrlSets } from "../hooks/use-url-sets";
 
 export default function HomePage() {
   const creatorsQuery = useCreators();
-  const urlSetsQuery = useUrlSets();
 
   const creators = creatorsQuery.data ?? [];
-  const urlSets = urlSetsQuery.data ?? [];
 
   const liveCount = useMemo(
     () => creators.filter((creator) => creator.liveStatus?.isLive).length,
@@ -40,11 +37,6 @@ export default function HomePage() {
             <p className="metric-value">{liveCount}</p>
             <p className="metric-caption">Currently online</p>
           </div>
-          <div className="metric-card">
-            <span className="metric-label">URL sets</span>
-            <p className="metric-value">{urlSets.length}</p>
-            <p className="metric-caption">Saved layouts</p>
-          </div>
         </div>
       </div>
 
@@ -64,9 +56,6 @@ export default function HomePage() {
           </Link>
           <Link href="/multiview" className="action-link">
             Build or restore a multi-view layout
-          </Link>
-          <Link href="/mixer" className="action-link">
-            Adjust audio mixer balances
           </Link>
           <Link href="/settings" className="action-link">
             Configure notifications and updates
