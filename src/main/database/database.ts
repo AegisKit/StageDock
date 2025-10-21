@@ -60,6 +60,24 @@ function toBoolean(value: unknown): 0 | 1 {
 
 }
 
+function normalizeTagsInput(tags?: string[] | null): string[] {
+
+  if (!tags) {
+
+    return [];
+
+  }
+
+  const normalized = tags
+
+    .map((tag) => tag.trim())
+
+    .filter((tag) => tag.length > 0);
+
+  return Array.from(new Set(normalized));
+
+}
+
 
 
 export class StageDockDatabase {
@@ -264,6 +282,8 @@ export class StageDockDatabase {
 
         notifyEnabled: true,
 
+        tags: [],
+
       },
 
       {
@@ -276,6 +296,8 @@ export class StageDockDatabase {
 
         notifyEnabled: true,
 
+        tags: [],
+
       },
 
       {
@@ -287,6 +309,8 @@ export class StageDockDatabase {
         displayName: "MrBeast",
 
         notifyEnabled: true,
+
+        tags: [],
 
       },
 
@@ -372,6 +396,8 @@ export class StageDockDatabase {
 
   ): Creator | undefined {
 
+    const trimmed = channelId.trim();
+
     const row = this.db
 
       .prepare<[string, string], any>(
@@ -387,7 +413,7 @@ export class StageDockDatabase {
 
       )
 
-      .get(platform, channelId);
+      .get(platform, trimmed);
 
     return row ? mapCreatorRow(row) : undefined;
 
@@ -401,6 +427,8 @@ export class StageDockDatabase {
 
       ...input,
 
+      tags: input.tags ?? [],
+
       id: input.id ?? randomUUID(),
 
       createdAt: input.createdAt ?? SQLITE_DATE_FORMAT(),
@@ -412,39 +440,27 @@ export class StageDockDatabase {
     const payload = creatorInsertSchema.parse(normalized);
 
     const id = normalized.id;
-
-
+    const normalizedTags = normalizeTagsInput(payload.tags ?? []);
+    const trimmedChannelId = payload.channelId.trim();
 
     try {
 
       this.db
 
         .prepare(
-
           `
-
           INSERT INTO creators (id, platform, channel_id, display_name, notify_enabled, created_at, tags)
-
           VALUES (@id, @platform, @channelId, @displayName, @notifyEnabled, @createdAt, @tags)
-
         `
-
         )
-
         .run({
-
           id,
-
           platform: payload.platform,
-
-          channelId: payload.channelId,
-
+          channelId: trimmedChannelId,
           displayName: payload.displayName,
-
           notifyEnabled: toBoolean(payload.notifyEnabled ?? true),
-
           createdAt: payload.createdAt ?? normalized.createdAt,
-
+          tags: JSON.stringify(normalizedTags)
         });
 
     } catch (error: unknown) {
@@ -491,7 +507,9 @@ export class StageDockDatabase {
 
     id: string,
 
-    patch: Partial<Pick<Creator, "displayName" | "notifyEnabled">>
+    patch: Partial<
+      Pick<Creator, "displayName" | "notifyEnabled" | "channelId" | "tags">
+    >
 
   ): Creator {
 
@@ -505,6 +523,23 @@ export class StageDockDatabase {
 
 
 
+    if (
+      patch.channelId &&
+      patch.channelId.trim() !== existing.channelId.trim()
+    ) {
+      const conflicting = this.findCreatorByChannel(
+        existing.platform,
+        patch.channelId.trim()
+      );
+      if (conflicting && conflicting.id !== id) {
+        throw new Error(
+          "Another creator already exists for the provided platform and channel ID"
+        );
+      }
+    }
+
+    const nextTags = patch.tags ? normalizeTagsInput(patch.tags) : existing.tags;
+
     const next: Creator = {
 
       ...existing,
@@ -514,6 +549,10 @@ export class StageDockDatabase {
       displayName: patch.displayName ?? existing.displayName,
 
       notifyEnabled: patch.notifyEnabled ?? existing.notifyEnabled,
+
+      channelId: patch.channelId?.trim() ?? existing.channelId,
+
+      tags: nextTags
 
     };
 
@@ -526,11 +565,10 @@ export class StageDockDatabase {
         `
 
         UPDATE creators
-
         SET display_name = @displayName,
-
-            notify_enabled = @notifyEnabled
-
+            notify_enabled = @notifyEnabled,
+            channel_id = @channelId,
+            tags = @tags
         WHERE id = @id
 
       `
@@ -544,6 +582,10 @@ export class StageDockDatabase {
         displayName: next.displayName,
 
         notifyEnabled: toBoolean(next.notifyEnabled),
+
+        channelId: next.channelId,
+
+        tags: JSON.stringify(next.tags ?? [])
 
       });
 
@@ -707,6 +749,8 @@ export class StageDockDatabase {
 
           c.created_at,
 
+          c.tags,
+
           ls.is_live,
 
           ls.title,
@@ -750,6 +794,8 @@ export class StageDockDatabase {
         notify_enabled: row.notify_enabled,
 
         created_at: row.created_at,
+
+        tags: row.tags ?? "[]"
 
       });
 

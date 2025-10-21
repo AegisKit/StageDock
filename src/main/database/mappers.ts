@@ -40,7 +40,14 @@ export function mapCreatorRow(row: CreatorRow) {
     try {
       const parsed = JSON.parse(row.tags);
       if (Array.isArray(parsed)) {
-        tags = parsed.filter((tag): tag is string => typeof tag === 'string');
+        tags = Array.from(
+          new Set(
+            parsed
+              .filter((tag): tag is string => typeof tag === 'string')
+              .map((tag) => tag.trim())
+              .filter((tag) => tag.length > 0)
+          )
+        );
       }
     } catch {
       tags = [];

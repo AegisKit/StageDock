@@ -56,14 +56,51 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
   ),
 };
 
+const UNTAGGED_TAG_VALUE = "__untagged__";
+const UNTAGGED_TAG_LABEL = "Untagged";
+
+function parseTagsInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,\\n]/)
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+    )
+  );
+}
+
+function formatTagsInput(tags: string[]): string {
+  return tags.join(", ");
+}
+
+function getCreatorTags(creator: CreatorWithStatus): string[] {
+  return Array.from(
+    new Set(
+      (creator.tags ?? [])
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+    )
+  );
+}
+
 const DEFAULT_FORM_STATE = {
   platform: "twitch" as CreatorPlatform,
   channelInput: "",
   displayName: "",
   notifyEnabled: true,
+  tagsInput: "",
 };
 
 type FormState = typeof DEFAULT_FORM_STATE;
+
+type EditFormState = {
+  platform: CreatorPlatform;
+  channelInput: string;
+  displayName: string;
+  notifyEnabled: boolean;
+  tagsInput: string;
+};
 
 function parseChannelInput(
   input: string
@@ -153,10 +190,16 @@ export default function FavoritesPage() {
   const creatorsQuery = useCreators();
   const createMutation = useCreateCreator();
   const updateMutation = useUpdateCreator();
+  const editMutation = useUpdateCreator();
   const deleteMutation = useDeleteCreator();
 
   const [formState, setFormState] = useState<FormState>(DEFAULT_FORM_STATE);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [editingCreator, setEditingCreator] =
+    useState<CreatorWithStatus | null>(null);
+  const [editState, setEditState] = useState<EditFormState | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const creators = creatorsQuery.data ?? [];
   const sortedCreators = useMemo(() => sortCreators(creators), [creators]);
@@ -164,6 +207,88 @@ export default function FavoritesPage() {
     () => sortedCreators.filter((creator) => creator.liveStatus?.isLive),
     [sortedCreators]
   );
+
+  const tagGroups = useMemo(() => {
+    const map = new Map<string, { label: string; creators: CreatorWithStatus[] }>();
+
+    sortedCreators.forEach((creator) => {
+      const tags = getCreatorTags(creator);
+      if (tags.length === 0) {
+        const entry =
+          map.get(UNTAGGED_TAG_VALUE) ?? {
+            label: UNTAGGED_TAG_LABEL,
+            creators: [] as CreatorWithStatus[],
+          };
+        entry.creators.push(creator);
+        map.set(UNTAGGED_TAG_VALUE, entry);
+      } else {
+        tags.forEach((tag) => {
+          const entry =
+            map.get(tag) ?? {
+              label: tag,
+              creators: [] as CreatorWithStatus[],
+            };
+          entry.creators.push(creator);
+          map.set(tag, entry);
+        });
+      }
+    });
+
+    const entries = Array.from(map.entries()).map(([key, value]) => ({
+      key,
+      label: value.label,
+      creators: value.creators.sort((a, b) =>
+        a.displayName.localeCompare(b.displayName, undefined, {
+          sensitivity: "base",
+        })
+      ),
+    }));
+
+    entries.sort((a, b) => {
+      if (a.key === UNTAGGED_TAG_VALUE) {
+        return 1;
+      }
+      if (b.key === UNTAGGED_TAG_VALUE) {
+        return -1;
+      }
+      return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+    });
+
+    return entries;
+  }, [sortedCreators]);
+
+  const tagFilterOptions = useMemo(
+    () =>
+      tagGroups.map(({ key, label, creators }) => ({
+        value: key,
+        label,
+        count: creators.length,
+      })),
+    [tagGroups]
+  );
+
+  useEffect(() => {
+    if (
+      activeTagFilter &&
+      !tagFilterOptions.some((option) => option.value === activeTagFilter)
+    ) {
+      setActiveTagFilter(null);
+    }
+  }, [activeTagFilter, tagFilterOptions]);
+
+  const filteredCreators = useMemo(() => {
+    if (!activeTagFilter) {
+      return sortedCreators;
+    }
+    if (activeTagFilter === UNTAGGED_TAG_VALUE) {
+      return sortedCreators.filter(
+        (creator) => getCreatorTags(creator).length === 0
+      );
+    }
+    return sortedCreators.filter((creator) =>
+      getCreatorTags(creator).includes(activeTagFilter)
+    );
+  }, [sortedCreators, activeTagFilter]);
 
   const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>([]);
   const selectedOnlineCreators = useMemo(
@@ -187,6 +312,17 @@ export default function FavoritesPage() {
     });
   }, [onlineCreators]);
 
+  useEffect(() => {
+    if (
+      editingCreator &&
+      !creators.some((creator) => creator.id === editingCreator.id)
+    ) {
+      setEditingCreator(null);
+      setEditState(null);
+      setEditError(null);
+    }
+  }, [editingCreator, creators]);
+
   const isSubmitting = createMutation.isPending;
 
   const handleInputChange =
@@ -194,6 +330,89 @@ export default function FavoritesPage() {
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setFormState((prev) => ({ ...prev, [field]: event.target.value }));
     };
+
+  const startEditingCreator = useCallback(
+    (creator: CreatorWithStatus) => {
+      const normalizedTags = getCreatorTags(creator);
+      setEditingCreator(creator);
+      setEditState({
+        platform: creator.platform,
+        channelInput: creator.channelId,
+        displayName: creator.displayName,
+        notifyEnabled: creator.notifyEnabled,
+        tagsInput: formatTagsInput(normalizedTags),
+      });
+      setEditError(null);
+    },
+    []
+  );
+
+  const handleEditInputChange =
+    (field: keyof EditFormState) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setEditState((prev) =>
+        prev ? { ...prev, [field]: event.target.value } : prev
+      );
+    };
+
+  const handleEditToggleNotify = (checked: boolean) => {
+    setEditState((prev) =>
+      prev ? { ...prev, notifyEnabled: checked } : prev
+    );
+  };
+
+  const handleEditCancel = () => {
+    setEditingCreator(null);
+    setEditState(null);
+    setEditError(null);
+  };
+
+  const handleEditSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingCreator || !editState) {
+      return;
+    }
+
+    setEditError(null);
+
+    const detection = parseChannelInput(editState.channelInput);
+    if (
+      detection.platform &&
+      detection.platform !== editingCreator.platform
+    ) {
+      setEditError("Channel URL belongs to a different platform.");
+      return;
+    }
+
+    const channelId = (detection.channelId ?? editState.channelInput).trim();
+    if (!channelId) {
+      setEditError("Enter a valid channel URL or ID.");
+      return;
+    }
+
+    const displayName =
+      editState.displayName.trim() || channelId;
+    const tags = parseTagsInput(editState.tagsInput);
+
+    try {
+      await editMutation.mutateAsync({
+        id: editingCreator.id,
+        displayName,
+        channelId,
+        notifyEnabled: editState.notifyEnabled,
+        tags,
+      });
+      setEditingCreator(null);
+      setEditState(null);
+      setEditError(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update creator.";
+      setEditError(message);
+    }
+  };
 
   const handleNotifyToggle = (creator: CreatorWithStatus) => {
     updateMutation.mutate({
@@ -280,6 +499,7 @@ export default function FavoritesPage() {
     }
 
     const displayName = formState.displayName.trim() || channelId;
+    const tags = parseTagsInput(formState.tagsInput);
 
     try {
       await createMutation.mutateAsync({
@@ -287,8 +507,13 @@ export default function FavoritesPage() {
         channelId,
         displayName,
         notifyEnabled: formState.notifyEnabled,
+        tags,
       });
-      setFormState(DEFAULT_FORM_STATE);
+      setFormState({
+        ...DEFAULT_FORM_STATE,
+        platform,
+        notifyEnabled: formState.notifyEnabled,
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to add creator.";
@@ -368,6 +593,22 @@ export default function FavoritesPage() {
               className="input"
             />
           </div>
+
+          <div>
+            <label className="label" htmlFor="tags">
+              Tags (optional)
+            </label>
+            <input
+              id="tags"
+              value={formState.tagsInput}
+              onChange={handleInputChange("tagsInput")}
+              placeholder="team, collab, fps"
+              className="input"
+            />
+            <p className="misc-note" style={{ marginTop: 6 }}>
+              Separate multiple tags with commas or line breaks.
+            </p>
+          </div>
         </div>
 
         <div className="form-actions">
@@ -442,6 +683,49 @@ export default function FavoritesPage() {
             in Multi-view
           </button>
         </div>
+        {tagFilterOptions.length > 0 && (
+          <div
+            className="tag-filter"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            <span className="misc-note">Filter by tag:</span>
+            <button
+              type="button"
+              className={
+                activeTagFilter === null
+                  ? "button button-primary"
+                  : "button button-outline"
+              }
+              onClick={() => setActiveTagFilter(null)}
+            >
+              All
+            </button>
+            {tagFilterOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={
+                  activeTagFilter === option.value
+                    ? "button button-primary"
+                    : "button button-outline"
+                }
+                onClick={() =>
+                  setActiveTagFilter((prev) =>
+                    prev === option.value ? null : option.value
+                  )
+                }
+              >
+                {option.label} ({option.count})
+              </button>
+            ))}
+          </div>
+        )}
         <div className="table-wrapper">
           <table className="table">
             <thead>
@@ -450,21 +734,26 @@ export default function FavoritesPage() {
                 <th>Display name</th>
                 <th>Platform</th>
                 <th>Channel ID</th>
+                <th>Tags</th>
                 <th>Notification</th>
                 <th>Status</th>
-                <th aria-label="actions" />
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedCreators.length === 0 && !creatorsQuery.isLoading ? (
+              {filteredCreators.length === 0 && !creatorsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="table-empty">
-                    No favorites yet. Use the form above to add one.
+                  <td colSpan={8} className="table-empty">
+                    {activeTagFilter
+                      ? "No creators match the selected tag."
+                      : "No favorites yet. Use the form above to add one."}
                   </td>
                 </tr>
               ) : (
-                sortedCreators.map((creator) => (
-                  <tr key={creator.id}>
+                filteredCreators.map((creator) => {
+                  const normalizedTags = getCreatorTags(creator);
+                  return (
+                    <tr key={creator.id}>
                     <td>
                       <input
                         type="checkbox"
@@ -486,6 +775,33 @@ export default function FavoritesPage() {
                     </td>
                     <td>{creator.channelId}</td>
                     <td>
+                      {normalizedTags.length > 0 ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 6,
+                          }}
+                        >
+                          {normalizedTags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="misc-note"
+                              style={{
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                background: "var(--color-surface-3, #1f1f1f)",
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="misc-note">{UNTAGGED_TAG_LABEL}</span>
+                      )}
+                    </td>
+                    <td>
                       <button
                         type="button"
                         className={`notify-toggle ${
@@ -501,7 +817,20 @@ export default function FavoritesPage() {
                         <span className="badge badge-offline">Offline</span>
                       )}
                     </td>
-                    <td style={{ textAlign: "right" }}>
+                    <td
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 8,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        onClick={() => startEditingCreator(creator)}
+                      >
+                        Edit
+                      </button>
                       <button
                         type="button"
                         className="button button-danger"
@@ -510,13 +839,197 @@ export default function FavoritesPage() {
                         Remove
                       </button>
                     </td>
-                  </tr>
-                ))
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+      {editingCreator && editState && (
+        <div className="panel">
+          <div
+            className="section-heading"
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <h2 className="section-title-small">
+                Edit {editingCreator.displayName}
+              </h2>
+              <span className="misc-note">
+                Platform: {PLATFORM_LABELS[editState.platform]}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={handleEditCancel}
+              disabled={editMutation.isPending}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <form onSubmit={handleEditSubmit} className="form-grid">
+            <div>
+              <label className="label" htmlFor="edit-displayName">
+                Display name
+              </label>
+              <input
+                id="edit-displayName"
+                value={editState.displayName}
+                onChange={handleEditInputChange("displayName")}
+                className="input"
+                placeholder="Display name"
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="edit-channel">
+                Channel URL or ID
+              </label>
+              <input
+                id="edit-channel"
+                value={editState.channelInput}
+                onChange={handleEditInputChange("channelInput")}
+                className="input"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="edit-tags">
+                Tags
+              </label>
+              <input
+                id="edit-tags"
+                value={editState.tagsInput}
+                onChange={handleEditInputChange("tagsInput")}
+                className="input"
+                placeholder="team, collab, fps"
+              />
+              <p className="misc-note" style={{ marginTop: 6 }}>
+                Separate multiple tags with commas or line breaks.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <label className="label" style={{ gap: 10, marginBottom: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={editState.notifyEnabled}
+                  onChange={(event) =>
+                    handleEditToggleNotify(event.target.checked)
+                  }
+                  className="checkbox"
+                />
+                Enable notifications
+              </label>
+
+              <button
+                type="submit"
+                className="button button-primary"
+                disabled={editMutation.isPending}
+              >
+                {editMutation.isPending ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+
+            {editError && (
+              <p className="button-danger" style={{ padding: "10px 14px" }}>
+                {editError}
+              </p>
+            )}
+          </form>
+        </div>
+      )}
+      {tagGroups.length > 0 && (
+        <div className="panel">
+          <div
+            className="section-heading"
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h2 className="section-title-small">By tag</h2>
+            <span className="misc-note">
+              {tagGroups.reduce((total, group) => total + group.creators.length, 0)}{" "}
+              assignments
+            </span>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            }}
+          >
+            {tagGroups.map((group) => (
+              <div
+                key={group.key}
+                className="card"
+                style={{ gap: 8, padding: 16 }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <h3 style={{ margin: 0 }}>{group.label}</h3>
+                  <span className="misc-note">{group.creators.length}</span>
+                </div>
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    gap: 4,
+                    display: "grid",
+                  }}
+                >
+                  {group.creators.map((creator) => (
+                    <li
+                      key={creator.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        alignItems: "center",
+                      }}
+                    >
+                      <span>{creator.displayName}</span>
+                      <span
+                        className={
+                          creator.liveStatus?.isLive
+                            ? "badge badge-live"
+                            : "badge badge-offline"
+                        }
+                      >
+                        {creator.liveStatus?.isLive ? "Live" : "Offline"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ export interface Creator {
   displayName: string;
   notifyEnabled: boolean;
   createdAt: string;
+  tags: string[];
 }
 
 export interface LiveStatus {
@@ -37,12 +38,15 @@ export interface CreateCreatorPayload {
   channelId: string;
   displayName: string;
   notifyEnabled?: boolean;
+  tags?: string[];
 }
 
 export interface UpdateCreatorPayload {
   id: string;
   displayName?: string;
+  channelId?: string;
   notifyEnabled?: boolean;
+  tags?: string[];
 }
 
 export interface SaveUrlSetPayload {
