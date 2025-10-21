@@ -209,25 +209,26 @@ export default function FavoritesPage() {
   );
 
   const tagGroups = useMemo(() => {
-    const map = new Map<string, { label: string; creators: CreatorWithStatus[] }>();
+    const map = new Map<
+      string,
+      { label: string; creators: CreatorWithStatus[] }
+    >();
 
     sortedCreators.forEach((creator) => {
       const tags = getCreatorTags(creator);
       if (tags.length === 0) {
-        const entry =
-          map.get(UNTAGGED_TAG_VALUE) ?? {
-            label: UNTAGGED_TAG_LABEL,
-            creators: [] as CreatorWithStatus[],
-          };
+        const entry = map.get(UNTAGGED_TAG_VALUE) ?? {
+          label: UNTAGGED_TAG_LABEL,
+          creators: [] as CreatorWithStatus[],
+        };
         entry.creators.push(creator);
         map.set(UNTAGGED_TAG_VALUE, entry);
       } else {
         tags.forEach((tag) => {
-          const entry =
-            map.get(tag) ?? {
-              label: tag,
-              creators: [] as CreatorWithStatus[],
-            };
+          const entry = map.get(tag) ?? {
+            label: tag,
+            creators: [] as CreatorWithStatus[],
+          };
           entry.creators.push(creator);
           map.set(tag, entry);
         });
@@ -331,34 +332,28 @@ export default function FavoritesPage() {
       setFormState((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
-  const startEditingCreator = useCallback(
-    (creator: CreatorWithStatus) => {
-      const normalizedTags = getCreatorTags(creator);
-      setEditingCreator(creator);
-      setEditState({
-        platform: creator.platform,
-        channelInput: creator.channelId,
-        displayName: creator.displayName,
-        notifyEnabled: creator.notifyEnabled,
-        tagsInput: formatTagsInput(normalizedTags),
-      });
-      setEditError(null);
-    },
-    []
-  );
+  const startEditingCreator = useCallback((creator: CreatorWithStatus) => {
+    const normalizedTags = getCreatorTags(creator);
+    setEditingCreator(creator);
+    setEditState({
+      platform: creator.platform,
+      channelInput: creator.channelId,
+      displayName: creator.displayName,
+      notifyEnabled: creator.notifyEnabled,
+      tagsInput: formatTagsInput(normalizedTags),
+    });
+    setEditError(null);
+  }, []);
 
   const handleEditInputChange =
-    (field: keyof EditFormState) =>
-    (event: ChangeEvent<HTMLInputElement>) => {
+    (field: keyof EditFormState) => (event: ChangeEvent<HTMLInputElement>) => {
       setEditState((prev) =>
         prev ? { ...prev, [field]: event.target.value } : prev
       );
     };
 
   const handleEditToggleNotify = (checked: boolean) => {
-    setEditState((prev) =>
-      prev ? { ...prev, notifyEnabled: checked } : prev
-    );
+    setEditState((prev) => (prev ? { ...prev, notifyEnabled: checked } : prev));
   };
 
   const handleEditCancel = () => {
@@ -376,10 +371,7 @@ export default function FavoritesPage() {
     setEditError(null);
 
     const detection = parseChannelInput(editState.channelInput);
-    if (
-      detection.platform &&
-      detection.platform !== editingCreator.platform
-    ) {
+    if (detection.platform && detection.platform !== editingCreator.platform) {
       setEditError("Channel URL belongs to a different platform.");
       return;
     }
@@ -390,8 +382,7 @@ export default function FavoritesPage() {
       return;
     }
 
-    const displayName =
-      editState.displayName.trim() || channelId;
+    const displayName = editState.displayName.trim() || channelId;
     const tags = parseTagsInput(editState.tagsInput);
 
     try {
@@ -407,9 +398,7 @@ export default function FavoritesPage() {
       setEditError(null);
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to update creator.";
+        error instanceof Error ? error.message : "Failed to update creator.";
       setEditError(message);
     }
   };
@@ -754,91 +743,93 @@ export default function FavoritesPage() {
                   const normalizedTags = getCreatorTags(creator);
                   return (
                     <tr key={creator.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedCreatorIds.includes(creator.id)}
-                        onChange={() => toggleCreatorSelection(creator.id)}
-                        disabled={!creator.liveStatus?.isLive}
-                        aria-label={`Select ${creator.displayName} for Multi-view`}
-                      />
-                    </td>
-                    <td>{creator.displayName}</td>
-                    <td>
-                      <span
-                        role="img"
-                        aria-label={PLATFORM_LABELS[creator.platform]}
-                        title={PLATFORM_LABELS[creator.platform]}
-                      >
-                        {PLATFORM_ICONS[creator.platform]}
-                      </span>
-                    </td>
-                    <td>{creator.channelId}</td>
-                    <td>
-                      {normalizedTags.length > 0 ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 6,
-                          }}
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedCreatorIds.includes(creator.id)}
+                          onChange={() => toggleCreatorSelection(creator.id)}
+                          disabled={!creator.liveStatus?.isLive}
+                          aria-label={`Select ${creator.displayName} for Multi-view`}
+                        />
+                      </td>
+                      <td>{creator.displayName}</td>
+                      <td>
+                        <span
+                          role="img"
+                          aria-label={PLATFORM_LABELS[creator.platform]}
+                          title={PLATFORM_LABELS[creator.platform]}
                         >
-                          {normalizedTags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="misc-note"
-                              style={{
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                background: "var(--color-surface-3, #1f1f1f)",
-                              }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="misc-note">{UNTAGGED_TAG_LABEL}</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={`notify-toggle ${
-                          creator.notifyEnabled ? "is-on" : "is-off"
-                        }`}
-                        onClick={() => handleNotifyToggle(creator)}
-                      ></button>
-                    </td>
-                    <td>
-                      {creator.liveStatus?.isLive ? (
-                        <span className="badge badge-live">Live</span>
-                      ) : (
-                        <span className="badge badge-offline">Offline</span>
-                      )}
-                    </td>
-                    <td
-                      style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        gap: 8,
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="button button-outline"
-                        onClick={() => startEditingCreator(creator)}
+                          {PLATFORM_ICONS[creator.platform]}
+                        </span>
+                      </td>
+                      <td>{creator.channelId}</td>
+                      <td>
+                        {normalizedTags.length > 0 ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 6,
+                            }}
+                          >
+                            {normalizedTags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="misc-note"
+                                style={{
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  background: "var(--color-surface-3, #1f1f1f)",
+                                }}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="misc-note">
+                            {UNTAGGED_TAG_LABEL}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`notify-toggle ${
+                            creator.notifyEnabled ? "is-on" : "is-off"
+                          }`}
+                          onClick={() => handleNotifyToggle(creator)}
+                        ></button>
+                      </td>
+                      <td>
+                        {creator.liveStatus?.isLive ? (
+                          <span className="badge badge-live">Live</span>
+                        ) : (
+                          <span className="badge badge-offline">Offline</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          gap: 8,
+                        }}
                       >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-danger"
-                        onClick={() => handleDelete(creator)}
-                      >
-                        Remove
-                      </button>
-                    </td>
+                        <button
+                          type="button"
+                          className="button button-outline"
+                          onClick={() => startEditingCreator(creator)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-danger"
+                          onClick={() => handleDelete(creator)}
+                        >
+                          Remove
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -952,82 +943,6 @@ export default function FavoritesPage() {
               </p>
             )}
           </form>
-        </div>
-      )}
-      {tagGroups.length > 0 && (
-        <div className="panel">
-          <div
-            className="section-heading"
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <h2 className="section-title-small">By tag</h2>
-            <span className="misc-note">
-              {tagGroups.reduce((total, group) => total + group.creators.length, 0)}{" "}
-              assignments
-            </span>
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            }}
-          >
-            {tagGroups.map((group) => (
-              <div
-                key={group.key}
-                className="card"
-                style={{ gap: 8, padding: 16 }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <h3 style={{ margin: 0 }}>{group.label}</h3>
-                  <span className="misc-note">{group.creators.length}</span>
-                </div>
-                <ul
-                  style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: 0,
-                    gap: 4,
-                    display: "grid",
-                  }}
-                >
-                  {group.creators.map((creator) => (
-                    <li
-                      key={creator.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        alignItems: "center",
-                      }}
-                    >
-                      <span>{creator.displayName}</span>
-                      <span
-                        className={
-                          creator.liveStatus?.isLive
-                            ? "badge badge-live"
-                            : "badge badge-offline"
-                        }
-                      >
-                        {creator.liveStatus?.isLive ? "Live" : "Offline"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

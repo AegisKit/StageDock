@@ -7,7 +7,9 @@ function normalizeUrls(input: string) {
   return input
     .split(/\r?\n/)
     .map((value) => value.trim())
-    .filter((value, index, self) => value.length > 0 && self.indexOf(value) === index);
+    .filter(
+      (value, index, self) => value.length > 0 && self.indexOf(value) === index
+    );
 }
 
 function convertToEmbedUrl(url: string): string {
@@ -135,7 +137,8 @@ export default function MultiViewPage() {
       <div className="section-heading">
         <h1 className="section-title">Multi-view</h1>
         <p className="section-description">
-          Paste one URL per line and StageDock will build a tailored multi-view window for you.
+          Paste one URL per line and StageDock will build a tailored multi-view
+          window for you.
         </p>
       </div>
 
@@ -145,7 +148,7 @@ export default function MultiViewPage() {
           onChange={(event) => setUrlsInput(event.target.value)}
           rows={4}
           className="textarea"
-          placeholder="https://www.youtube.com/watch?v=...\nhttps://www.twitch.tv/..."
+          placeholder={`https://www.youtube.com/watch?v=...\nhttps://www.twitch.tv/...`}
         />
         <div className="form-actions">
           <div style={{ display: "flex", gap: 12 }}>
