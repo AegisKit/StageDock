@@ -63,7 +63,7 @@ function parseTagsInput(value: string): string[] {
   return Array.from(
     new Set(
       value
-        .split(/[,\\n]/)
+        .split(/,|\r?\n/)
         .map((tag) => tag.trim())
         .filter((tag) => tag.length > 0)
     )
@@ -495,13 +495,24 @@ export default function FavoritesPage() {
     const tags = parseTagsInput(formState.tagsInput);
 
     try {
-      await createMutation.mutateAsync({
+      const newCreator = await createMutation.mutateAsync({
         platform,
         channelId,
         displayName,
         notifyEnabled: formState.notifyEnabled,
         tags,
       });
+      if (newCreator) {
+        try {
+          await getStageDock().creators.refreshStatus(newCreator.id);
+        } catch (refreshError) {
+          console.error(
+            "Failed to refresh live status immediately after creation:",
+            refreshError
+          );
+        }
+        await creatorsQuery.refetch();
+      }
       setFormState({
         ...DEFAULT_FORM_STATE,
         platform,

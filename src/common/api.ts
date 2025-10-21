@@ -17,6 +17,7 @@ export interface StageDockAPI {
     create: (payload: CreateCreatorPayload) => Promise<Creator>;
     update: (payload: UpdateCreatorPayload) => Promise<Creator>;
     delete: (id: string) => Promise<{ success: boolean }>;
+    refreshStatus: (id: string) => Promise<LiveStatus | null>;
   };
   liveStatus: {
     list: () => Promise<LiveStatus[]>;

@@ -17,6 +17,7 @@ const IPC_CHANNELS = {
   CREATORS_CREATE: "creators:create",
   CREATORS_UPDATE: "creators:update",
   CREATORS_DELETE: "creators:delete",
+  CREATORS_REFRESH_STATUS: "creators:refresh-status",
   LIVE_STATUS_LIST: "live-status:list",
   LIVE_STATUS_UPSERT: "live-status:upsert",
   URL_SETS_LIST: "url-sets:list",
@@ -37,6 +38,7 @@ export type StageDockAPI = {
     create: (payload: CreateCreatorPayload) => Promise<Creator>;
     update: (payload: UpdateCreatorPayload) => Promise<Creator>;
     delete: (id: string) => Promise<{ success: boolean }>;
+    refreshStatus: (id: string) => Promise<LiveStatus | null>;
   };
   liveStatus: {
     list: () => Promise<LiveStatus[]>;
@@ -89,6 +91,12 @@ const api: StageDockAPI = {
       return (await ipcRenderer.invoke(IPC_CHANNELS.CREATORS_DELETE, {
         id,
       })) as { success: boolean };
+    },
+    refreshStatus: async (id) => {
+      return (await ipcRenderer.invoke(
+        IPC_CHANNELS.CREATORS_REFRESH_STATUS,
+        { id }
+      )) as LiveStatus | null;
     },
   },
   liveStatus: {
