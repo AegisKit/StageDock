@@ -103,6 +103,7 @@ async function createMultiviewWindow(urls: string[], layout: string) {
     show: false,
     frame: true,
     titleBarStyle: "default",
+    icon: path.join(__dirname, "../../assets/icon.png"), // アイコンを設定
     webPreferences: {
       preload: resolvePreloadPath(),
       nodeIntegration: false,
@@ -152,7 +153,7 @@ async function createWindow() {
     show: false,
     frame: true, // フレームを有効にしてタイトルバーを表示
     titleBarStyle: "default", // デフォルトのタイトルバースタイル
-    icon: path.join(__dirname, "../../assets/icon.ico"), // アイコンを設定
+    icon: path.join(__dirname, "../../assets/icon.png"), // アイコンを設定
     webPreferences: {
       preload: resolvePreloadPath(),
       nodeIntegration: false,
