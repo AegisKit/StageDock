@@ -76,7 +76,12 @@ export default function LiveNowPage() {
   }, [creators]);
 
   const handleOpenExternal = useCallback((creator: CreatorWithStatus) => {
-    void getStageDock().openExternal(buildChannelUrl(creator));
+    const liveUrl =
+      creator.liveStatus?.isLive && creator.liveStatus?.streamUrl
+        ? creator.liveStatus.streamUrl
+        : null;
+    const targetUrl = liveUrl ?? buildChannelUrl(creator);
+    void getStageDock().openExternal(targetUrl);
   }, []);
 
   const handleAddToMultiview = useCallback((creator: CreatorWithStatus) => {
