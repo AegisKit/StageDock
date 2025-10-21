@@ -1,6 +1,0 @@
-# GitHub Releases でソースコードzipを除外
-*.zip linguist-generated=true
-dist/ linguist-generated=true
-node_modules/ linguist-generated=true
-renderer/.next/ linguist-generated=true
-renderer/out/ linguist-generated=true
