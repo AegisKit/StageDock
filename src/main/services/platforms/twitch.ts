@@ -5,6 +5,7 @@ export interface TwitchLiveStatus {
   title: string | null;
   viewerCount: number | null;
   startedAt: string | null;
+  streamUrl: string | null;
 }
 
 let appAccessToken: string | null = null;
@@ -77,19 +78,21 @@ export async function fetchTwitchLiveStatus(channelName: string): Promise<Twitch
 
     const stream = payload.data?.[0];
     if (!stream) {
-      return {
-        isLive: false,
-        title: null,
-        viewerCount: null,
-        startedAt: null
-      };
+    return {
+      isLive: false,
+      title: null,
+      viewerCount: null,
+      startedAt: null,
+      streamUrl: null
+    };
     }
 
     return {
       isLive: true,
       title: stream.title,
       viewerCount: stream.viewer_count,
-      startedAt: stream.started_at
+      startedAt: stream.started_at,
+      streamUrl: `https://www.twitch.tv/${channelName}`
     };
   } catch (error) {
     console.warn('Twitch live status fetch failed', error);

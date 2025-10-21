@@ -533,7 +533,7 @@ a {
   border-top: 1px solid var(--border);
 }
 
-/* マルチビューコンテナ */
+/* マルチビューコンチE�� */
 .multiview-container {
   display: flex;
   flex-direction: column;
@@ -599,7 +599,7 @@ a {
   min-height: 100vh;
 }
 
-/* ストリームグリッド */
+/* ストリームグリチE�� */
 .stream-grid {
   display: grid;
   gap: 8px;
@@ -608,7 +608,7 @@ a {
   min-height: 400px;
 }
 
-/* ストリームアイテム */
+/* ストリームアイチE�� */
 .stream-item {
   position: relative;
   background: var(--surface);
@@ -733,7 +733,7 @@ a {
   gap: 4px;
 }
 
-/* レスポンシブ対応 */
+/* レスポンシブ対忁E*/
 @media (max-width: 768px) {
   .multiview-controls {
     flex-direction: column;
@@ -756,3 +756,6 @@ a {
     height: 100px;
   }
 }
+@import './favorites.css';
+
+

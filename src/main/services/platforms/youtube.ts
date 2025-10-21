@@ -5,6 +5,7 @@ export interface YouTubeLiveStatus {
   title: string | null;
   viewerCount: number | null;
   startedAt: string | null;
+  streamUrl: string | null;
 }
 
 export async function fetchYouTubeLiveStatus(channelIdOrHandle: string): Promise<YouTubeLiveStatus | null> {
@@ -45,7 +46,7 @@ export async function fetchYouTubeLiveStatus(channelIdOrHandle: string): Promise
     }
 
     const payload = (await response.body.json()) as {
-      items?: Array<{ id: { videoId: string }; snippet: { title: string; publishedAt: string } }>;
+      items?: Array<{ id: { videoId?: string }; snippet: { title: string; publishedAt: string } }>;
     };
 
     const liveItem = payload.items?.[0];
@@ -54,15 +55,18 @@ export async function fetchYouTubeLiveStatus(channelIdOrHandle: string): Promise
         isLive: false,
         title: null,
         viewerCount: null,
-        startedAt: null
+        startedAt: null,
+        streamUrl: null
       };
     }
 
+    const videoId = liveItem.id?.videoId;
     return {
       isLive: true,
       title: liveItem.snippet.title,
       viewerCount: null,
-      startedAt: liveItem.snippet.publishedAt
+      startedAt: liveItem.snippet.publishedAt,
+      streamUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : null
     };
   } catch (error) {
     console.warn('YouTube live status fetch failed', error);

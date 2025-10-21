@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import type {
   CreatorPlatform,
   CreatorWithStatus,
+  LiveStatus,
 } from "../../../src/common/types.js";
 import {
   useCreateCreator,
@@ -13,11 +14,48 @@ import {
   useUpdateCreator,
 } from "../../hooks/use-creators";
 import { useStageDockReady } from "../../hooks/use-stagedock-ready";
+import { getStageDock } from "../../lib/stagedock";
 
 const PLATFORM_LABELS: Record<CreatorPlatform, string> = {
   twitch: "Twitch",
   youtube: "YouTube",
 };
+
+const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
+  twitch: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      focusable="false"
+      aria-hidden="true"
+    >
+      <path
+        fill="#9146FF"
+        d="M4 3h16v12l-4 4h-5l-3 3H6v-3H4V3Zm14 10V5H6v10h4v3l3-3h5Z"
+      />
+      <path fill="#fff" d="M13 8h2v4h-2zM9 8h2v4H9z" />
+    </svg>
+  ),
+  youtube: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      focusable="false"
+      aria-hidden="true"
+    >
+      <path
+        fill="#FF0000"
+        d="M21.6 7.2c-.2-.9-.9-1.5-1.8-1.7C18 5.2 12 5.2 12 5.2s-6 0-7.8.3c-.9.2-1.6.8-1.8 1.7C2.1 9 2 10.9 2 10.9s-.1 1.9.4 3.7c.2.9.9 1.5 1.8 1.7 1.8.3 7.8.3 7.8.3s6 0 7.8-.3c.9-.2 1.6-.8 1.8-1.7.5-1.8.4-3.7.4-3.7s.1-1.9-.4-3.7Z"
+      />
+      <path fill="#fff" d="m10 8.8 4.8 2.1-4.8 2.1V8.8Z" />
+    </svg>
+  ),
+};
+
 
 const DEFAULT_FORM_STATE = {
   platform: "twitch" as CreatorPlatform,
@@ -88,6 +126,29 @@ function sortCreators(creators: CreatorWithStatus[]): CreatorWithStatus[] {
   });
 }
 
+function buildStreamUrl(creator: CreatorWithStatus): string | null {
+  const channelId = creator.channelId.trim();
+  if (!channelId) {
+    return null;
+  }
+
+  if (creator.platform === "twitch") {
+    return `https://www.twitch.tv/${channelId}`;
+  }
+
+  if (creator.platform === "youtube") {
+    if (channelId.startsWith("@")) {
+      return `https://www.youtube.com/${channelId}/live`;
+    }
+    if (channelId.startsWith("UC") || channelId.startsWith("HC")) {
+      return `https://www.youtube.com/channel/${channelId}/live`;
+    }
+    return `https://www.youtube.com/@${channelId}/live`;
+  }
+
+  return null;
+}
+
 export default function FavoritesPage() {
   const ready = useStageDockReady();
   const creatorsQuery = useCreators();
@@ -100,6 +161,30 @@ export default function FavoritesPage() {
 
   const creators = creatorsQuery.data ?? [];
   const sortedCreators = useMemo(() => sortCreators(creators), [creators]);
+  const onlineCreators = useMemo(
+    () => sortedCreators.filter((creator) => creator.liveStatus?.isLive),
+    [sortedCreators]
+  );
+
+  const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>([]);
+  const selectedOnlineCreators = useMemo(
+    () => onlineCreators.filter((creator) => selectedCreatorIds.includes(creator.id)),
+    [onlineCreators, selectedCreatorIds]
+  );
+
+  useEffect(() => {
+    setSelectedCreatorIds((prev) => {
+      const activeIds = onlineCreators.map((creator) => creator.id);
+      const next = prev.filter((id) => activeIds.includes(id));
+      activeIds.forEach((id) => {
+        if (!next.includes(id)) {
+          next.push(id);
+        }
+      });
+      return next;
+    });
+  }, [onlineCreators]);
+
   const isSubmitting = createMutation.isPending;
 
   const handleInputChange =
@@ -121,6 +206,56 @@ export default function FavoritesPage() {
     }
     deleteMutation.mutate(creator.id);
   };
+
+  const toggleCreatorSelection = useCallback(
+    (creatorId: string) => {
+      if (!onlineCreators.some((creator) => creator.id === creatorId)) {
+        return;
+      }
+      setSelectedCreatorIds((prev) =>
+        prev.includes(creatorId)
+          ? prev.filter((id) => id !== creatorId)
+          : [...prev, creatorId]
+      );
+    },
+    [onlineCreators]
+  );
+
+  const handleOpenOnlineStreams = useCallback(async () => {
+    if (!ready) {
+      return;
+    }
+
+    let statusByCreator: Map<string, LiveStatus> | null = null;
+    try {
+      const statuses = await getStageDock().liveStatus.list();
+      statusByCreator = new Map(statuses.map((status) => [status.creatorId, status]));
+    } catch (error) {
+      console.error("Failed to refresh live status before opening multi-view:", error);
+    }
+
+    const urls = Array.from(
+      new Set(
+        selectedOnlineCreators
+          .map((creator) =>
+            statusByCreator?.get(creator.id)?.streamUrl ??
+            creator.liveStatus?.streamUrl ??
+            buildStreamUrl(creator)
+          )
+          .filter((url): url is string => Boolean(url))
+      )
+    );
+
+    if (urls.length === 0) {
+      return;
+    }
+
+    try {
+      await getStageDock().multiview.open(urls, "2x2");
+    } catch (error) {
+      console.error("Failed to open multi-view window for favorites:", error);
+    }
+  }, [ready, selectedOnlineCreators]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -159,6 +294,7 @@ export default function FavoritesPage() {
 
   if (!ready) {
     return (
+
       <div className="section">
         <div className="panel">
           <p className="misc-note">
@@ -170,7 +306,8 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="section">
+
+    <div className="section favorites-page" role="region">
       <div className="section-heading">
         <h1 className="section-title">Favorites</h1>
         <p className="section-description">
@@ -275,20 +412,33 @@ export default function FavoritesPage() {
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            gap: 16,
           }}
         >
-          <h2 className="section-title-small">Registered creators</h2>
-          <span className="misc-note">
-            {creatorsQuery.isLoading
-              ? "Loading..."
-              : `${creators.length} total`}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 className="section-title-small">Registered creators</h2>
+            <span className="misc-note">
+              {creatorsQuery.isLoading
+                ? "Loading..."
+                : `${creators.length} total`}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={handleOpenOnlineStreams}
+            disabled={!ready || selectedOnlineCreators.length === 0}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {selectedOnlineCreators.length > 0 ? `Open Selected (${selectedOnlineCreators.length})` : "Open Selected"} in Multi-view
+          </button>
         </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
-              <tr>
-                <th>Display name</th>
+                <tr>
+                  <th>Select</th>
+                  <th>Display name</th>
                 <th>Platform</th>
                 <th>Channel ID</th>
                 <th>Notification</th>
@@ -306,16 +456,25 @@ export default function FavoritesPage() {
               ) : (
                 sortedCreators.map((creator) => (
                   <tr key={creator.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedCreatorIds.includes(creator.id)}
+                        onChange={() => toggleCreatorSelection(creator.id)}
+                        disabled={!creator.liveStatus?.isLive}
+                        aria-label={`Select ${creator.displayName} for Multi-view`}
+                      />
+                    </td>
                     <td>{creator.displayName}</td>
-                    <td>{PLATFORM_LABELS[creator.platform]}</td>
+                    <td><span role="img" aria-label={PLATFORM_LABELS[creator.platform]} title={PLATFORM_LABELS[creator.platform]}>{PLATFORM_ICONS[creator.platform]}</span></td>
                     <td>{creator.channelId}</td>
                     <td>
                       <button
                         type="button"
-                        className="button button-outline"
+                        className={`notify-toggle ${creator.notifyEnabled ? "is-on" : "is-off"}`}
                         onClick={() => handleNotifyToggle(creator)}
                       >
-                        {creator.notifyEnabled ? "On" : "Off"}
+                        
                       </button>
                     </td>
                     <td>
@@ -344,3 +503,8 @@ export default function FavoritesPage() {
     </div>
   );
 }
+
+
+
+
+

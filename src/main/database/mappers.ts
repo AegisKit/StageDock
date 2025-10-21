@@ -1,4 +1,4 @@
-import { creatorSchema, liveStatusSchema, settingSchema, urlSetSchema } from './schema.js';
+﻿import { creatorSchema, liveStatusSchema, settingSchema, urlSetSchema } from './schema.js';
 
 type CreatorRow = {
   id: string;
@@ -16,6 +16,7 @@ type LiveStatusRow = {
   game: string | null;
   started_at: string | null;
   viewer_count: number | null;
+  stream_url: string | null;
   updated_at: string;
 };
 
@@ -51,6 +52,7 @@ export function mapLiveStatusRow(row: LiveStatusRow) {
     game: row.game,
     startedAt: row.started_at,
     viewerCount: row.viewer_count,
+    streamUrl: row.stream_url,
     updatedAt: row.updated_at
   });
 }

@@ -1,4 +1,4 @@
-export type CreatorPlatform = 'twitch' | 'youtube';
+﻿export type CreatorPlatform = 'twitch' | 'youtube';
 
 export interface Creator {
   id: string;
@@ -16,6 +16,7 @@ export interface LiveStatus {
   game: string | null;
   startedAt: string | null;
   viewerCount: number | null;
+  streamUrl: string | null;
   updatedAt: string;
 }
 

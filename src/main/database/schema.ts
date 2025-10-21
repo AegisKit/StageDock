@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const CREATOR_PLATFORMS = ['twitch', 'youtube'] as const;
 
@@ -27,10 +27,12 @@ export const liveStatusSchema = z.object({
   game: z.string().nullable(),
   startedAt: z.string().datetime().nullable(),
   viewerCount: z.number().int().nullable(),
+  streamUrl: z.string().url().nullable(),
   updatedAt: z.string().datetime()
 });
 
 export const liveStatusUpsertSchema = liveStatusSchema.extend({
+  streamUrl: liveStatusSchema.shape.streamUrl.optional(),
   updatedAt: liveStatusSchema.shape.updatedAt.optional()
 });
 
