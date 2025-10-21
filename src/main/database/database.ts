@@ -64,15 +64,16 @@ export class StageDockDatabase {
         UNIQUE (platform, channel_id)
       );
 
-      CREATE TABLE IF NOT EXISTS live_status (
-        creator_id TEXT PRIMARY KEY REFERENCES creators(id) ON DELETE CASCADE,
-        is_live INTEGER NOT NULL,
-        title TEXT,
-        game TEXT,
-        started_at TEXT,
-        viewer_count INTEGER,
-        updated_at TEXT NOT NULL
-      );
+        CREATE TABLE IF NOT EXISTS live_status (
+          creator_id TEXT PRIMARY KEY REFERENCES creators(id) ON DELETE CASCADE,
+          is_live INTEGER NOT NULL,
+          title TEXT,
+          game TEXT,
+          started_at TEXT,
+          viewer_count INTEGER,
+          stream_url TEXT,
+          updated_at TEXT NOT NULL
+        );
 
       CREATE TABLE IF NOT EXISTS url_sets (
         id TEXT PRIMARY KEY,
@@ -93,16 +94,26 @@ export class StageDockDatabase {
     `;
 
     this.db.exec(createStatements);
+    try {
+      this.db.exec("ALTER TABLE live_status ADD COLUMN stream_url TEXT");
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes("duplicate column name")
+      ) {
+        logger.warn({ error }, "Failed to ensure stream_url column on live_status");
+      }
+    }
     this.initializeDefaultData();
   }
 
   private initializeDefaultData(): void {
-    // Êó¢Â≠ò„ÅÆcreators„Åå„ÅÑ„Çã„Åã„ÉÅ„Çß„ÉÉ„ÇØ
+    // ä˘ë∂ÇÃcreatorsÇ™Ç¢ÇÈÇ©É`ÉFÉbÉN
     const existingCreators = this.db
       .prepare<unknown[], any>("SELECT COUNT(*) as count FROM creators")
       .get() as { count: number };
 
-    // Êó¢„Å´„Éá„Éº„Çø„Åå„ÅÇ„ÇãÂ†¥Âêà„ÅØÂàùÊúüÂåñ„Çí„Çπ„Ç≠„ÉÉ„Éó
+    // ä˘Ç…ÉfÅ[É^Ç™Ç†ÇÈèÍçáÇÕèâä˙âªÇÉXÉLÉbÉv
     if (existingCreators.count > 0) {
       logger.debug("Default creators already exist, skipping initialization");
       return;
@@ -110,7 +121,7 @@ export class StageDockDatabase {
 
     logger.info("Initializing default creators");
 
-    // „Éá„Éï„Ç©„É´„Éà„ÅÆfavorites„Çí3‰ª∂ÁôªÈå≤
+    // ÉfÉtÉHÉãÉgÇÃfavoritesÇ3åèìoò^
     const defaultCreators = [
       {
         platform: "twitch" as const,
@@ -272,7 +283,7 @@ export class StageDockDatabase {
     const rows = this.db
       .prepare<unknown[], any>(
         `
-        SELECT creator_id, is_live, title, game, started_at, viewer_count, updated_at
+        SELECT creator_id, is_live, title, game, started_at, viewer_count, stream_url, updated_at
         FROM live_status
       `
       )
@@ -289,14 +300,15 @@ export class StageDockDatabase {
     this.db
       .prepare(
         `
-        INSERT INTO live_status (creator_id, is_live, title, game, started_at, viewer_count, updated_at)
-        VALUES (@creatorId, @isLive, @title, @game, @startedAt, @viewerCount, @updatedAt)
+        INSERT INTO live_status (creator_id, is_live, title, game, started_at, viewer_count, stream_url, updated_at)
+        VALUES (@creatorId, @isLive, @title, @game, @startedAt, @viewerCount, @streamUrl, @updatedAt)
         ON CONFLICT(creator_id) DO UPDATE SET
           is_live = excluded.is_live,
           title = excluded.title,
           game = excluded.game,
           started_at = excluded.started_at,
           viewer_count = excluded.viewer_count,
+          stream_url = excluded.stream_url,
           updated_at = excluded.updated_at
       `
       )
@@ -307,13 +319,14 @@ export class StageDockDatabase {
         game: data.game ?? null,
         startedAt: data.startedAt ?? null,
         viewerCount: data.viewerCount ?? null,
+        streamUrl: data.streamUrl ?? null,
         updatedAt: data.updatedAt,
       });
 
     const row = this.db
       .prepare<[string], any>(
         `
-        SELECT creator_id, is_live, title, game, started_at, viewer_count, updated_at
+        SELECT creator_id, is_live, title, game, started_at, viewer_count, stream_url, updated_at
         FROM live_status
         WHERE creator_id = ?
       `
@@ -343,6 +356,7 @@ export class StageDockDatabase {
           ls.game,
           ls.started_at,
           ls.viewer_count,
+          ls.stream_url,
           ls.updated_at
         FROM creators c
         LEFT JOIN live_status ls ON ls.creator_id = c.id
@@ -370,6 +384,7 @@ export class StageDockDatabase {
               game: row.game,
               started_at: row.started_at,
               viewer_count: row.viewer_count,
+              stream_url: row.stream_url,
               updated_at: row.updated_at,
             })
           : null;
@@ -496,3 +511,4 @@ export class StageDockDatabase {
     return value;
   }
 }
+

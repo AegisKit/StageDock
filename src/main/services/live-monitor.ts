@@ -1,4 +1,4 @@
-import { logger } from "../utils/logger.js";
+﻿import { logger } from "../utils/logger.js";
 import type { StageDockDatabase } from "../database/database.js";
 import { fetchTwitchLiveStatus } from "./platforms/twitch.js";
 import { fetchYouTubeLiveStatus } from "./platforms/youtube.js";
@@ -77,6 +77,9 @@ export class LiveMonitor {
       game: null,
       startedAt: status.startedAt ?? null,
       viewerCount: status.viewerCount ?? null,
+      streamUrl: status.isLive
+        ? status.streamUrl ?? `https://www.twitch.tv/${creator.channelId}`
+        : null,
       updatedAt: new Date().toISOString(),
     });
 
@@ -89,7 +92,7 @@ export class LiveMonitor {
       "Updated Twitch live status"
     );
 
-    this.handleTransition(creator, status.isLive);
+    this.handleTransition(creator, status.isLive, status.streamUrl);
   }
 
   private async syncYouTubeCreator(creator: Creator) {
@@ -113,6 +116,9 @@ export class LiveMonitor {
       game: null,
       startedAt: status.startedAt ?? null,
       viewerCount: status.viewerCount ?? null,
+      streamUrl: status.isLive
+        ? status.streamUrl ?? buildYouTubeUrl(creator.channelId, true)
+        : null,
       updatedAt: new Date().toISOString(),
     });
 
@@ -125,18 +131,23 @@ export class LiveMonitor {
       "Updated YouTube live status"
     );
 
-    this.handleTransition(creator, status.isLive);
+    this.handleTransition(creator, status.isLive, status.streamUrl);
   }
 
-  private handleTransition(creator: Creator, isLive: boolean) {
+  private handleTransition(
+    creator: Creator,
+    isLive: boolean,
+    streamUrl?: string | null
+  ) {
     const previous = this.lastState.get(creator.id);
     this.lastState.set(creator.id, { isLive });
 
     if (isLive && !previous?.isLive && creator.notifyEnabled) {
       const url =
-        creator.platform === "twitch"
+        streamUrl ??
+        (creator.platform === "twitch"
           ? `https://www.twitch.tv/${creator.channelId}`
-          : buildYouTubeUrl(creator.channelId);
+          : buildYouTubeUrl(creator.channelId, true));
       this.notifications.showLiveNotification({
         displayName: creator.displayName,
         platform: creator.platform === "twitch" ? "Twitch" : "YouTube",
@@ -146,12 +157,18 @@ export class LiveMonitor {
   }
 }
 
-function buildYouTubeUrl(channelId: string) {
+function buildYouTubeUrl(channelId: string, live = false) {
   if (channelId.startsWith("@")) {
-    return `https://www.youtube.com/${channelId}`;
+    return live
+      ? `https://www.youtube.com/${channelId}/live`
+      : `https://www.youtube.com/${channelId}`;
   }
-  if (channelId.startsWith("UC")) {
-    return `https://www.youtube.com/channel/${channelId}`;
+  if (channelId.startsWith("UC") || channelId.startsWith("HC")) {
+    return live
+      ? `https://www.youtube.com/channel/${channelId}/live`
+      : `https://www.youtube.com/channel/${channelId}`;
   }
-  return `https://www.youtube.com/@${channelId}`;
+  return live
+    ? `https://www.youtube.com/@${channelId}/live`
+    : `https://www.youtube.com/@${channelId}`;
 }

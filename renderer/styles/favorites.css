@@ -1,0 +1,68 @@
+.favorites-page .notify-toggle {
+  position: relative;
+  width: 64px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  cursor: pointer;
+  background: var(--toggle-off-bg, #2f3136);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.favorites-page .notify-toggle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.favorites-page .notify-toggle.is-on {
+  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.favorites-page .notify-toggle.is-on::after {
+  transform: translateX(36px);
+}
+
+.favorites-page .notify-toggle.is-off {
+  background: linear-gradient(135deg, #3a3d40, #181719);
+}
+
+.favorites-page .notify-toggle.is-off::after {
+  transform: translateX(0);
+}
+
+.favorites-page .notify-toggle:focus-visible {
+  outline: 2px solid rgba(88, 101, 242, 0.8);
+  outline-offset: 3px;
+}
+
+.favorites-page .notify-toggle-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.favorites-page .notify-toggle.is-on .notify-toggle-label {
+  left: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.favorites-page .notify-toggle.is-off .notify-toggle-label {
+  right: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
