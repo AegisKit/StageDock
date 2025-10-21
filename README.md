@@ -2,8 +2,6 @@
 
 StageDock is a desktop application for Windows built with Electron, Next.js (React 18), and TypeScript. It helps power viewers keep track of their favourite Twitch and YouTube channels, launch multi-view layouts, and control audio balances from a single surface.
 
-> **Status:** prototype. Platform integrations and sync features require API keys/tokens before they become fully functional.
-
 ## Requirements
 
 - Node.js 22 LTS
@@ -27,18 +25,6 @@ The development script launches:
 - `next dev ./renderer` (renderer UI)
 - TypeScript compiler in watch mode for the main/preload code
 - Electron with context isolation enabled
-
-### Environment variables
-
-Set the following environment variables before running the app to enable live polling:
-
-| Variable                 | Purpose                              |
-| ------------------------ | ------------------------------------ |
-| `TWITCH_CLIENT_ID`       | Twitch application client ID         |
-| `TWITCH_CLIENT_SECRET`   | Twitch application client secret     |
-| `YOUTUBE_API_KEY`        | YouTube Data API v3 key              |
-
-For development you can create a `.env` file and rely on a shell to load it before starting `npm run dev`.
 
 ## Project structure
 
