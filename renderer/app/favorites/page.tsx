@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ChangeEvent, FormEvent, JSX } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, JSX } from "react";
 import type {
   CreatorPlatform,
   CreatorWithStatus,
@@ -54,6 +54,17 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
       <path fill="#fff" d="M9.75 8.5v7L15.5 12z" />
     </svg>
   ),
+};
+
+const LIVE_LINK_BUTTON_STYLE: CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
+  color: "var(--accent)",
+  textDecoration: "underline",
+  cursor: "pointer",
 };
 
 const UNTAGGED_TAG_VALUE = "__untagged__";
@@ -185,7 +196,7 @@ function buildStreamUrl(creator: CreatorWithStatus): string | null {
   return null;
 }
 
-export default function FavoritesPage() {
+export default function CreatorsPage() {
   const ready = useStageDockReady();
   const creatorsQuery = useCreators();
   const createMutation = useCreateCreator();
@@ -336,6 +347,15 @@ export default function FavoritesPage() {
     setFormState((prev) => ({ ...prev, platform }));
   };
 
+  const handleOpenStream = useCallback((creator: CreatorWithStatus) => {
+    const targetUrl =
+      creator.liveStatus?.streamUrl ?? buildStreamUrl(creator);
+    if (!targetUrl) {
+      return;
+    }
+    void getStageDock().openExternal(targetUrl);
+  }, []);
+
   const startEditingCreator = useCallback((creator: CreatorWithStatus) => {
     const normalizedTags = getCreatorTags(creator);
     setEditingCreator(creator);
@@ -473,7 +493,7 @@ export default function FavoritesPage() {
     try {
       await getStageDock().multiview.open(urls, "2x2");
     } catch (error) {
-      console.error("Failed to open multi-view window for favorites:", error);
+      console.error("Failed to open multi-view window for creators:", error);
     }
   }, [ready, selectedOnlineCreators]);
 
@@ -542,9 +562,9 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="section favorites-page" role="region">
+    <div className="section creators-page" role="region">
       <div className="section-heading">
-        <h1 className="section-title">Favorites</h1>
+        <h1 className="section-title">Creators</h1>
         <p className="section-description">
           Register Twitch or YouTube channels, manage notifications, and keep
           live creators at the top of your list.
@@ -663,7 +683,7 @@ export default function FavoritesPage() {
             className="button button-primary"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Saving..." : "Add to favorites"}
+            {isSubmitting ? "Saving..." : "Add creator"}
           </button>
         </div>
 
@@ -692,7 +712,7 @@ export default function FavoritesPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h2 className="section-title-small">Registered creators</h2>
+            <h2 className="section-title-small">Creators</h2>
             <span className="misc-note">
               {creatorsQuery.isLoading
                 ? "Loading..."
@@ -775,7 +795,7 @@ export default function FavoritesPage() {
                   <td colSpan={8} className="table-empty">
                     {activeTagFilter
                       ? "No creators match the selected tag."
-                      : "No favorites yet. Use the form above to add one."}
+                      : "No creators yet. Use the form above to add one."}
                   </td>
                 </tr>
               ) : (
@@ -792,7 +812,20 @@ export default function FavoritesPage() {
                           aria-label={`Select ${creator.displayName} for Multi-view`}
                         />
                       </td>
-                      <td>{creator.displayName}</td>
+                      <td>
+                        {creator.liveStatus?.isLive ? (
+                          <button
+                            type="button"
+                            style={LIVE_LINK_BUTTON_STYLE}
+                            onClick={() => handleOpenStream(creator)}
+                            aria-label={`Open ${creator.displayName}'s live stream`}
+                          >
+                            {creator.displayName}
+                          </button>
+                        ) : (
+                          creator.displayName
+                        )}
+                      </td>
                       <td style={{ textAlign: "center" }}>
                         <span
                           role="img"
