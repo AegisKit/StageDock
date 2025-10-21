@@ -1,0 +1,21 @@
+appId: com.stagedock.app
+productName: StageDock
+directories:
+  output: dist/electron
+  buildResources: build
+icon: assets/icon.ico
+files:
+  - dist/main/**
+  - dist/preload/**
+  - dist/renderer/**
+  - package.json
+extraMetadata:
+  main: dist/main/main/index.js
+win:
+  target:
+    - nsis
+  artifactName: StageDock-${version}-win.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist/main",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@main/*": ["src/main/*"],
+      "@common/*": ["src/common/*"]
+    },
+    "moduleResolution": "NodeNext",
+    "composite": true,
+    "declaration": true,
+    "declarationDir": "dist/main/types",
+    "sourceMap": true,
+    "tsBuildInfoFile": "dist/main/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/main/**/*.tsx",
+    "src/common/**/*.ts",
+    "src/common/**/*.tsx"
+  ],
+  "references": [{ "path": "./tsconfig.common.json" }]
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist/main",
+    "rootDir": "src",
+    "composite": true,
+    "declaration": true,
+    "declarationDir": "dist/common/types",
+    "sourceMap": true,
+    "tsBuildInfoFile": "dist/common/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/common/**/*.ts", "src/common/**/*.tsx"]
+}
