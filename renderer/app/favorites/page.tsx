@@ -33,9 +33,9 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
     >
       <path
         fill="#9146FF"
-        d="M4 3h16v12l-4 4h-5l-3 3H6v-3H4V3Zm14 10V5H6v10h4v3l3-3h5Z"
+        d="M2 0h20v13l-5 5h-4.5l-3.5 3.5V18H6l-4-4V0Zm18 11V2H6v12h5v2.5L14.5 14H18l2-2Z"
       />
-      <path fill="#fff" d="M13 8h2v4h-2zM9 8h2v4H9z" />
+      <path fill="#fff" d="M10 6h2v5h-2zm5 0h2v5h-2z" />
     </svg>
   ),
   youtube: (
@@ -49,9 +49,9 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
     >
       <path
         fill="#FF0000"
-        d="M21.6 7.2c-.2-.9-.9-1.5-1.8-1.7C18 5.2 12 5.2 12 5.2s-6 0-7.8.3c-.9.2-1.6.8-1.8 1.7C2.1 9 2 10.9 2 10.9s-.1 1.9.4 3.7c.2.9.9 1.5 1.8 1.7 1.8.3 7.8.3 7.8.3s6 0 7.8-.3c.9-.2 1.6-.8 1.8-1.7.5-1.8.4-3.7.4-3.7s.1-1.9-.4-3.7Z"
+        d="M21.8 6.8a2.73 2.73 0 0 0-1.9-1.9C18.4 4.2 12 4.2 12 4.2s-6.4 0-7.9.7A2.73 2.73 0 0 0 2.2 6.8C1.5 8.3 1.5 12 1.5 12s0 3.7.7 5.2a2.73 2.73 0 0 0 1.9 1.9c1.5.7 7.9.7 7.9.7s6.4 0 7.9-.7a2.73 2.73 0 0 0 1.9-1.9c.7-1.5.7-5.2.7-5.2s0-3.7-.7-5.2Z"
       />
-      <path fill="#fff" d="m10 8.8 4.8 2.1-4.8 2.1V8.8Z" />
+      <path fill="#fff" d="M9.75 8.5v7L15.5 12z" />
     </svg>
   ),
 };
@@ -332,6 +332,10 @@ export default function FavoritesPage() {
       setFormState((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
+  const handlePlatformSelect = (platform: CreatorPlatform) => {
+    setFormState((prev) => ({ ...prev, platform }));
+  };
+
   const startEditingCreator = useCallback((creator: CreatorWithStatus) => {
     const normalizedTags = getCreatorTags(creator);
     setEditingCreator(creator);
@@ -539,21 +543,46 @@ export default function FavoritesPage() {
       <form className="panel" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div>
-            <label className="label" htmlFor="platform">
+            <span className="label" style={{ marginBottom: 8, display: "block" }}>
               Platform
-            </label>
-            <select
-              id="platform"
-              value={formState.platform}
-              onChange={handleInputChange("platform")}
-              className="select"
+            </span>
+            <div
+              role="group"
+              aria-label="Select platform"
+              style={{
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
             >
-              {Object.entries(PLATFORM_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              {Object.entries(PLATFORM_LABELS).map(([value, label]) => {
+                const platformValue = value as CreatorPlatform;
+                const isActive = formState.platform === platformValue;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handlePlatformSelect(platformValue)}
+                    aria-pressed={isActive}
+                    className={`button ${isActive ? "button-primary" : "button-outline"}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 14px",
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{ display: "inline-flex", alignItems: "center" }}
+                    >
+                      {PLATFORM_ICONS[platformValue]}
+                    </span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>
@@ -719,9 +748,9 @@ export default function FavoritesPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Select</th>
+                <th style={{ textAlign: "center" }}>Select</th>
                 <th>Display name</th>
-                <th>Platform</th>
+                <th style={{ textAlign: "center" }}>Platform</th>
                 <th>Channel ID</th>
                 <th>Tags</th>
                 <th>Notification</th>
@@ -743,7 +772,7 @@ export default function FavoritesPage() {
                   const normalizedTags = getCreatorTags(creator);
                   return (
                     <tr key={creator.id}>
-                      <td>
+                      <td style={{ textAlign: "center" }}>
                         <input
                           type="checkbox"
                           checked={selectedCreatorIds.includes(creator.id)}
@@ -753,7 +782,7 @@ export default function FavoritesPage() {
                         />
                       </td>
                       <td>{creator.displayName}</td>
-                      <td>
+                      <td style={{ textAlign: "center" }}>
                         <span
                           role="img"
                           aria-label={PLATFORM_LABELS[creator.platform]}
@@ -808,11 +837,15 @@ export default function FavoritesPage() {
                           <span className="badge badge-offline">Offline</span>
                         )}
                       </td>
-                      <td
+                    <td style={{ textAlign: "left" }}>
+                      <div
                         style={{
                           display: "flex",
-                          justifyContent: "flex-end",
+                          justifyContent: "flex-start",
+                          alignItems: "center",
                           gap: 8,
+                          flexWrap: "wrap",
+                          minWidth: 160,
                         }}
                       >
                         <button
@@ -829,7 +862,8 @@ export default function FavoritesPage() {
                         >
                           Remove
                         </button>
-                      </td>
+                      </div>
+                    </td>
                     </tr>
                   );
                 })
