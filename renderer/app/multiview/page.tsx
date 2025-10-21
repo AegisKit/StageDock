@@ -61,11 +61,6 @@ export default function MultiViewPage() {
     setActiveStream(urls[0] ?? null);
   }, [urlsInput]);
 
-  const handleRemoveStream = useCallback((target: string) => {
-    setStreams((prev) => prev.filter((url) => url !== target));
-    setActiveStream((current) => (current === target ? null : current));
-  }, []);
-
   const handleAddStream = useCallback(
     (url: string) => {
       setStreams((prev) => {
@@ -203,24 +198,6 @@ export default function MultiViewPage() {
                     title={url}
                     style={{ width: "100%", height: "200px", border: "none" }}
                   />
-                  <div className="preview-actions">
-                    <button
-                      type="button"
-                      className="button button-outline"
-                      style={{ padding: "4px 10px", fontSize: 12 }}
-                      onClick={() => setActiveStream(url)}
-                    >
-                      Set active
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-danger"
-                      style={{ padding: "4px 10px", fontSize: 12 }}
-                      onClick={() => handleRemoveStream(url)}
-                    >
-                      Remove
-                    </button>
-                  </div>
                 </div>
               );
             })}

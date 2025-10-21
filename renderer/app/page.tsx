@@ -22,13 +22,13 @@ export default function HomePage() {
         <div className="section-heading">
           <h1 className="section-title">StageDock dashboard</h1>
           <p className="section-description">
-            Quick overview of your favorites and saved layouts. Jump to each
+            Quick overview of your creators and saved layouts. Jump to each
             feature using the shortcuts on the right.
           </p>
         </div>
         <div className="metric-grid">
           <div className="metric-card">
-            <span className="metric-label">Favorites</span>
+            <span className="metric-label">Creators</span>
             <p className="metric-value">{creators.length}</p>
             <p className="metric-caption">Registered creators</p>
           </div>
@@ -49,10 +49,7 @@ export default function HomePage() {
         </div>
         <div className="action-list">
           <Link href="/favorites" className="action-link">
-            Manage favorite creators
-          </Link>
-          <Link href="/live" className="action-link">
-            Check who is live right now
+            Manage creators
           </Link>
           <Link href="/multiview" className="action-link">
             Build or restore a multi-view layout
