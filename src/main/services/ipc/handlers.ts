@@ -15,7 +15,9 @@ import { logger } from "../../utils/logger.js";
 const creatorUpdateSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().min(1).optional(),
+  channelId: z.string().min(1).optional(),
   notifyEnabled: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 const deleteByIdSchema = z.object({
@@ -44,7 +46,7 @@ export function registerIpcHandlers(database: StageDockDatabase): void {
       const input = creatorInsertSchema.parse(rawInput);
       const existing = database.findCreatorByChannel(
         input.platform,
-        input.channelId
+        input.channelId.trim()
       );
       if (existing) {
         throw new Error(
@@ -60,6 +62,8 @@ export function registerIpcHandlers(database: StageDockDatabase): void {
     return database.updateCreator(input.id, {
       displayName: input.displayName,
       notifyEnabled: input.notifyEnabled,
+      channelId: input.channelId,
+      tags: input.tags,
     });
   });
 
