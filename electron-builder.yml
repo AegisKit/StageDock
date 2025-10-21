@@ -1,5 +1,9 @@
 appId: com.stagedock.app
 productName: StageDock
+publish:
+  provider: github
+  owner: AegisKit
+  repo: stagedock
 directories:
   output: dist/electron
   buildResources: build
