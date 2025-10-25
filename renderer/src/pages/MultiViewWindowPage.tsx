@@ -34,7 +34,7 @@ function toYouTubeEmbed(urlObj: URL) {
   const isOldVideo =
     id.startsWith("2F") || id.startsWith("3F") || id.startsWith("4F");
   const params = new URLSearchParams({
-    autoplay: "0",
+    autoplay: "1",
     mute: "0",
     controls: "1",
     rel: "0",
@@ -54,7 +54,7 @@ function toYouTubeEmbed(urlObj: URL) {
     params.set("rel", "0"); // 関連動画を無効化
     params.set("modestbranding", "1"); // YouTubeロゴを最小化
     params.set("fs", "1"); // フルスクリーンを有効化
-    params.set("autoplay", "0"); // 自動再生を無効化
+    params.set("autoplay", "1"); // 自動再生を有効化
     params.set("mute", "0"); // ミュートを無効化
   }
 
@@ -105,7 +105,7 @@ function convertToEmbedUrl(url: string): string {
           urlObj.searchParams.set("rel", "0");
           urlObj.searchParams.set("modestbranding", "1");
           urlObj.searchParams.set("fs", "1");
-          urlObj.searchParams.set("autoplay", "0");
+          urlObj.searchParams.set("autoplay", "1");
           urlObj.searchParams.set("mute", "0");
           const finalUrl = urlObj.toString();
           return finalUrl;
