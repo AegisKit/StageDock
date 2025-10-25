@@ -93,10 +93,9 @@ const api: StageDockAPI = {
       })) as { success: boolean };
     },
     refreshStatus: async (id) => {
-      return (await ipcRenderer.invoke(
-        IPC_CHANNELS.CREATORS_REFRESH_STATUS,
-        { id }
-      )) as LiveStatus | null;
+      return (await ipcRenderer.invoke(IPC_CHANNELS.CREATORS_REFRESH_STATUS, {
+        id,
+      })) as LiveStatus | null;
     },
   },
   liveStatus: {
@@ -153,6 +152,7 @@ const api: StageDockAPI = {
   },
 };
 
+console.log("Preload script: Exposing StageDock API");
 contextBridge.exposeInMainWorld("stagedock", api);
 
 // マルチビューウィンドウ用のIPC通信
@@ -162,6 +162,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 });
 
+console.log("Preload script: Dispatching stagedock:ready event");
 if (typeof window !== "undefined") {
   window.dispatchEvent(new Event("stagedock:ready"));
 }

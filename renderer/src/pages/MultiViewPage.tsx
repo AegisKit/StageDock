@@ -1,7 +1,5 @@
-﻿"use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getStageDock } from "../../lib/stagedock";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { getStageDock } from "../lib/stagedock";
 
 function normalizeUrls(input: string) {
   return input
@@ -12,43 +10,97 @@ function normalizeUrls(input: string) {
     );
 }
 
+function toYouTubeEmbed(urlObj: URL) {
+  const host = urlObj.hostname;
+  const path = urlObj.pathname;
+
+  console.log("🔍 YouTube埋め込み解析開始:", {
+    originalUrl: urlObj.href,
+    hostname: host,
+    pathname: path,
+    searchParams: Object.fromEntries(urlObj.searchParams.entries())
+  });
+
+  // 複雑な処理は一時的に無効化
+
+  // 通常の videoId 抽出（watch/shorts/live/embed/youtu.be）
+  let id = "";
+  if (host.includes("youtu.be")) {
+    id = urlObj.pathname.split("/").filter(Boolean)[0] || "";
+    console.log("📺 youtu.be形式の動画ID:", id);
+  }
+  if (!id && host.includes("youtube.com")) {
+    if (path.startsWith("/watch")) {
+      id = urlObj.searchParams.get("v") || "";
+      console.log("📺 /watch形式の動画ID:", id);
+    } else if (path.startsWith("/shorts/")) {
+      id = path.split("/")[2] || "";
+      console.log("📺 /shorts形式の動画ID:", id);
+    } else if (path.startsWith("/live/")) {
+      id = path.split("/")[2] || "";
+      console.log("📺 /live形式の動画ID:", id);
+    } else if (path.startsWith("/embed/")) {
+      id = path.split("/")[2] || "";
+      console.log("📺 /embed形式の動画ID:", id);
+    }
+  }
+  
+  if (!id) {
+    console.log("❌ 動画IDが取得できませんでした");
+    return null;
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${id}`;
+  console.log("✅ 生成された埋め込みURL:", embedUrl);
+  
+  return embedUrl;
+}
+
+function withAltDomain(embedUrl: string) {
+  return embedUrl.includes("www.youtube.com")
+    ? embedUrl.replace("www.youtube.com", "www.youtube-nocookie.com")
+    : embedUrl.replace("www.youtube-nocookie.com", "www.youtube.com");
+}
+
 function convertToEmbedUrl(url: string): string {
+  console.log("🌐 埋め込みURL変換開始:", url);
+  
   try {
-    const urlObj = new URL(url);
+    const u = new URL(url);
+    console.log("🔗 URL解析結果:", {
+      hostname: u.hostname,
+      pathname: u.pathname,
+      search: u.search
+    });
 
-    if (
-      urlObj.hostname.includes("youtube.com") ||
-      urlObj.hostname.includes("youtu.be")
-    ) {
-      let videoId = "";
-
-      if (urlObj.hostname.includes("youtu.be")) {
-        videoId = urlObj.pathname.slice(1);
-      } else if (urlObj.hostname.includes("youtube.com")) {
-        videoId = urlObj.searchParams.get("v") || "";
-      }
-
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
-      }
-    }
-
-    if (urlObj.hostname.includes("twitch.tv")) {
-      const pathParts = urlObj.pathname.split("/").filter(Boolean);
-      if (pathParts.length > 0) {
-        const channel = pathParts[0];
-        return `https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}`;
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      console.log("📺 YouTube URL検出");
+      const embed = toYouTubeEmbed(u);
+      if (embed) {
+        console.log("✅ YouTube埋め込みURL生成成功:", embed);
+        return embed;
+      } else {
+        console.log("❌ YouTube埋め込みURL生成失敗");
       }
     }
 
+    if (u.hostname.includes("twitch.tv")) {
+      console.log("🎮 Twitch URL検出");
+      const ch = u.pathname.split("/").filter(Boolean)[0];
+      const twitchUrl = `https://player.twitch.tv/?channel=${ch}&parent=localhost`;
+      console.log("✅ Twitch埋め込みURL生成:", twitchUrl);
+      return twitchUrl;
+    }
+
+    console.log("⚠️ 対応していないURL形式、元のURLを返します:", url);
     return url;
   } catch (error) {
-    console.error("Error converting URL to embed:", error);
+    console.error("❌ URL解析エラー:", error);
     return url;
   }
 }
 
-export default function MultiViewPage() {
+export function MultiViewPage() {
   const [urlsInput, setUrlsInput] = useState("");
   const [streams, setStreams] = useState<string[]>([]);
   const [activeStream, setActiveStream] = useState<string | null>(null);
@@ -193,10 +245,16 @@ export default function MultiViewPage() {
                 >
                   <iframe
                     src={embedUrl}
-                    allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
                     title={url}
                     style={{ width: "100%", height: "200px", border: "none" }}
+                    frameBorder="0"
+                    onLoad={() => {
+                      console.log("✅ iframe読み込み完了:", url);
+                    }}
+                    onError={(e) => {
+                      console.error("❌ iframe読み込みエラー:", url, e);
+                    }}
                   />
                 </div>
               );
@@ -207,3 +265,4 @@ export default function MultiViewPage() {
     </div>
   );
 }
+

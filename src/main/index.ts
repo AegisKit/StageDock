@@ -2,8 +2,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-import electronUpdater from "electron-updater";
+// import { fileURLToPath } from "node:url";
+import { autoUpdater } from "electron-updater";
+// import { getPort } from "get-port-please";
+// import { startServer } from "next/dist/server/lib/start-server";
 import { logger } from "./utils/logger.js";
 import { IPC_CHANNELS } from "../common/ipc.js";
 import { StageDockDatabase } from "./database/database.js";
@@ -67,13 +69,13 @@ loadEnvFromFile();
 
 const isDevelopment = !app.isPackaged;
 const ELECTRON_RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
-const { autoUpdater } = electronUpdater;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// CommonJSでは__filenameと__dirnameは自動的に利用可能
 let mainWindow: BrowserWindow | null = null;
 function resolvePreloadPath() {
   return path.join(__dirname, "../../preload/preload/index.cjs");
 }
+
+// Reactサーバーは不要 - 静的ファイルを直接読み込み
 
 function resolveMultiviewUrl() {
   if (isDevelopment && ELECTRON_RENDERER_URL) {
@@ -85,7 +87,7 @@ function resolveMultiviewUrl() {
     "renderer",
     "index.html"
   );
-  return `file://${indexPath}`;
+  return `file://${indexPath}#/multiview-window`;
 }
 
 async function createMultiviewWindow(urls: string[], layout: string) {
@@ -93,6 +95,9 @@ async function createMultiviewWindow(urls: string[], layout: string) {
     multiviewWindow.focus();
     return;
   }
+
+  const multiviewPreloadPath = resolvePreloadPath();
+  logger.info({ multiviewPreloadPath }, "Multiview preload script path");
 
   multiviewWindow = new BrowserWindow({
     width: 1920,
@@ -105,15 +110,46 @@ async function createMultiviewWindow(urls: string[], layout: string) {
     titleBarStyle: "default",
     icon: path.join(__dirname, "../../assets/icon.png"), // アイコンを設定
     webPreferences: {
-      preload: resolvePreloadPath(),
+      preload: multiviewPreloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
       spellcheck: false,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
+      experimentalFeatures: true,
+      partition: "persist:main",
     },
   });
 
   multiviewWindow.setTitle("StageDock Multi-view");
+
+  // Content Security Policyを無効化
+  multiviewWindow.webContents.session.webRequest.onHeadersReceived(
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-src *;",
+          ],
+        },
+      });
+    }
+  );
+
+  // YouTube埋め込み用のReferer強制付与（一時的に無効化）
+  // multiviewWindow.webContents.session.webRequest.onBeforeSendHeaders(
+  //   (details, callback) => {
+  //     if (
+  //       details.url.includes("youtube.com") ||
+  //       details.url.includes("googlevideo.com")
+  //     ) {
+  //       details.requestHeaders["Referer"] = "https://www.youtube.com/";
+  //     }
+  //     callback({ requestHeaders: details.requestHeaders });
+  //   }
+  // );
 
   multiviewWindow.on("ready-to-show", () => {
     multiviewWindow?.show();
@@ -131,19 +167,28 @@ async function createMultiviewWindow(urls: string[], layout: string) {
 }
 
 export { createMultiviewWindow, multiviewWindow };
-function resolveRendererUrl() {
-  if (isDevelopment && ELECTRON_RENDERER_URL) {
-    return ELECTRON_RENDERER_URL;
-  }
-  const indexPath = path.join(
-    app.getAppPath(),
-    "dist",
-    "renderer",
-    "index.html"
-  );
-  return `file://${indexPath}`;
-}
+// function resolveRendererUrl() {
+//   if (isDevelopment && ELECTRON_RENDERER_URL) {
+//     return ELECTRON_RENDERER_URL;
+//   }
+//   // standaloneモードではNext.jsサーバーを使用
+//   if (nextJSPort) {
+//     return `http://localhost:${nextJSPort}`;
+//   }
+//   // フォールバック: 静的ファイル
+//   const indexPath = path.join(
+//     app.getAppPath(),
+//     "dist",
+//     "renderer",
+//     "index.html"
+//   );
+//   return `file://${indexPath}`;
+// }
 async function createWindow() {
+  const preloadPath = resolvePreloadPath();
+  console.log("Preload script path:", preloadPath);
+  logger.info({ preloadPath }, "Preload script path");
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -155,11 +200,15 @@ async function createWindow() {
     titleBarStyle: "default", // デフォルトのタイトルバースタイル
     icon: path.join(__dirname, "../../assets/icon.png"), // アイコンを設定
     webPreferences: {
-      preload: resolvePreloadPath(),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
       spellcheck: false,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
+      experimentalFeatures: true,
+      partition: "persist:main",
     },
   });
   // ウィンドウタイトルを設定
@@ -171,14 +220,68 @@ async function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
-  const rendererUrl = resolveRendererUrl();
-  const preloadPath = resolvePreloadPath();
 
-  logger.info(
-    { preloadPath, rendererUrl },
-    "Loading renderer with preload script"
+  const loadURL = async () => {
+    if (!mainWindow) return;
+
+    try {
+      if (isDevelopment && ELECTRON_RENDERER_URL) {
+        logger.info({ url: ELECTRON_RENDERER_URL }, "Loading development URL");
+        await mainWindow.loadURL(ELECTRON_RENDERER_URL);
+      } else {
+        // 本番環境では静的ファイルを直接読み込み
+        logger.info("Loading React static files for production");
+        const indexPath = path.join(
+          app.getAppPath(),
+          "dist",
+          "renderer",
+          "index.html"
+        );
+        if (existsSync(indexPath)) {
+          logger.info({ indexPath }, "Loading renderer from static file");
+          await mainWindow.loadURL(`file://${indexPath}`);
+        } else {
+          throw new Error("No renderer files found");
+        }
+      }
+    } catch (error) {
+      logger.error({ error }, "Failed to load renderer completely");
+      // 最終的なフォールバック: エラーページ
+      await mainWindow.loadURL(
+        `data:text/html,<html><body><h1>StageDock</h1><p>Failed to load application. Please restart the app.</p></body></html>`
+      );
+    }
+  };
+
+  await loadURL();
+
+  // Content Security Policyを無効化
+  mainWindow.webContents.session.webRequest.onHeadersReceived(
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-src *;",
+          ],
+        },
+      });
+    }
   );
-  await mainWindow.loadURL(rendererUrl);
+
+  // YouTube埋め込み用のReferer強制付与（一時的に無効化）
+  // mainWindow.webContents.session.webRequest.onBeforeSendHeaders(
+  //   (details, callback) => {
+  //     if (
+  //       details.url.includes("youtube.com") ||
+  //       details.url.includes("googlevideo.com")
+  //     ) {
+  //       details.requestHeaders["Referer"] = "https://www.youtube.com/";
+  //     }
+  //     callback({ requestHeaders: details.requestHeaders });
+  //   }
+  // );
+
   if (isDevelopment) {
     try {
       mainWindow.webContents.openDevTools({ mode: "detach" });
@@ -199,6 +302,8 @@ function registerCoreIpcHandlers() {
 // クリーンアップ関数
 function cleanup() {
   logger.info("Cleaning up resources...");
+
+  // Reactサーバーは使用しないため、クリーンアップ不要
 
   if (liveMonitor) {
     liveMonitor.stop();
@@ -236,67 +341,78 @@ function setupSignalHandlers() {
 
   // 未処理の例外
   process.on("uncaughtException", (error) => {
-    logger.fatal({ error }, "Uncaught exception");
+    console.error("Uncaught Exception:", error);
+    logger.fatal({ error, stack: error.stack }, "Uncaught exception");
     cleanup();
     process.exit(1);
   });
 
   // 未処理のPromise拒否
   process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection:", reason);
     logger.fatal({ reason, promise }, "Unhandled promise rejection");
     cleanup();
     process.exit(1);
   });
 }
 async function initializeApp() {
-  // シグナルハンドラーを最初に設定
-  setupSignalHandlers();
+  try {
+    // シグナルハンドラーを最初に設定
+    setupSignalHandlers();
 
-  if (!app.requestSingleInstanceLock()) {
-    app.quit();
-    return;
-  }
-
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
-    }
-  });
-
-  app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
+    if (!app.requestSingleInstanceLock()) {
       app.quit();
+      return;
     }
-  });
 
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow();
+    app.on("second-instance", () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.focus();
+      }
+    });
+
+    app.on("window-all-closed", () => {
+      if (process.platform !== "darwin") {
+        app.quit();
+      }
+    });
+
+    app.on("activate", async () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await createWindow();
+      }
+    });
+
+    app.on("before-quit", () => {
+      cleanup();
+    });
+
+    await app.whenReady();
+    database = await StageDockDatabase.create();
+    notificationService = new NotificationService();
+    liveMonitor = new LiveMonitor(database, notificationService);
+    liveMonitor.start();
+    registerIpcHandlers(database);
+    registerCoreIpcHandlers();
+    await createWindow();
+
+    if (!isDevelopment) {
+      try {
+        await autoUpdater.checkForUpdatesAndNotify();
+      } catch (error) {
+        logger.warn({ error }, "Auto update check failed");
+      }
     }
-  });
-
-  app.on("before-quit", () => {
+  } catch (error) {
+    logger.fatal(
+      { error, stack: error instanceof Error ? error.stack : undefined },
+      "Failed to initialize app"
+    );
     cleanup();
-  });
-
-  await app.whenReady();
-  database = await StageDockDatabase.create();
-  notificationService = new NotificationService();
-  liveMonitor = new LiveMonitor(database, notificationService);
-  liveMonitor.start();
-  registerIpcHandlers(database);
-  registerCoreIpcHandlers();
-  await createWindow();
-
-  if (!isDevelopment) {
-    try {
-      await autoUpdater.checkForUpdatesAndNotify();
-    } catch (error) {
-      logger.warn({ error }, "Auto update check failed");
-    }
+    app.exit(1);
   }
 }
 initializeApp().catch((error) => {

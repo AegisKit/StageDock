@@ -1,6 +1,4 @@
-"use client";
-
-import type { StageDockAPI } from "../../src/common/api.js";
+import type { StageDockAPI } from "../../../src/common/api.js";
 
 export function isStageDockAvailable(): boolean {
   const available = typeof window !== "undefined" && Boolean(window.stagedock);

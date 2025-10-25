@@ -1,10 +1,8 @@
-"use client";
-
-import Link from "next/link";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useCreators } from "../hooks/use-creators";
 
-export default function HomePage() {
+export function HomePage() {
   const creatorsQuery = useCreators();
 
   const creators = creatorsQuery.data ?? [];
@@ -13,8 +11,6 @@ export default function HomePage() {
     () => creators.filter((creator) => creator.liveStatus?.isLive).length,
     [creators]
   );
-
-  // readyがfalseでもデータを表示する（初期データまたはキャッシュされたデータ）
 
   return (
     <div className="section">
@@ -48,13 +44,13 @@ export default function HomePage() {
           </p>
         </div>
         <div className="action-list">
-          <Link href="/favorites" className="action-link">
+          <Link to="/favorites" className="action-link">
             Manage creators
           </Link>
-          <Link href="/multiview" className="action-link">
+          <Link to="/multiview" className="action-link">
             Build or restore a multi-view layout
           </Link>
-          <Link href="/settings" className="action-link">
+          <Link to="/settings" className="action-link">
             Configure notifications and updates
           </Link>
         </div>

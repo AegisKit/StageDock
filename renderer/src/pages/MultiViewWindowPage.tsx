@@ -1,51 +1,128 @@
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface MultiviewData {
   urls: string[];
   layout: string;
 }
 
+function toYouTubeEmbed(urlObj: URL) {
+  const host = urlObj.hostname;
+  const path = urlObj.pathname;
+
+  // 通常の videoId 抽出（watch/shorts/live/embed/youtu.be）
+  let id = "";
+  if (host.includes("youtu.be")) {
+    id = urlObj.pathname.split("/").filter(Boolean)[0] || "";
+  }
+  if (!id && host.includes("youtube.com")) {
+    if (path.startsWith("/watch")) {
+      id = urlObj.searchParams.get("v") || "";
+    } else if (path.startsWith("/shorts/")) {
+      id = path.split("/")[2] || "";
+    } else if (path.startsWith("/live/")) {
+      id = path.split("/")[2] || "";
+    } else if (path.startsWith("/embed/")) {
+      id = path.split("/")[2] || "";
+    }
+  }
+
+  if (!id) {
+    return null;
+  }
+
+  // 古い動画の埋め込み制限を回避するための特別な処理
+  const isOldVideo =
+    id.startsWith("2F") || id.startsWith("3F") || id.startsWith("4F");
+  const params = new URLSearchParams({
+    autoplay: "0",
+    mute: "0",
+    controls: "1",
+    rel: "0",
+    modestbranding: "1",
+    fs: "1",
+    playsinline: "1",
+  });
+
+  // 古い動画の場合は追加パラメータを設定
+  if (isOldVideo) {
+    params.set("enablejsapi", "1");
+    params.set("origin", "https://localhost");
+    params.set("widget_referrer", "https://localhost");
+    params.set("iv_load_policy", "3"); // アノテーションを無効化
+    params.set("cc_load_policy", "0"); // 字幕を無効化
+    params.set("disablekb", "0"); // キーボードショートカットを有効化
+    params.set("rel", "0"); // 関連動画を無効化
+    params.set("modestbranding", "1"); // YouTubeロゴを最小化
+    params.set("fs", "1"); // フルスクリーンを有効化
+    params.set("autoplay", "0"); // 自動再生を無効化
+    params.set("mute", "0"); // ミュートを無効化
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${id}?${params.toString()}`;
+
+  return embedUrl;
+}
+
+function withAltDomain(embedUrl: string) {
+  if (embedUrl.includes("www.youtube.com")) {
+    const altUrl = embedUrl.replace(
+      "www.youtube.com",
+      "www.youtube-nocookie.com"
+    );
+    return altUrl;
+  } else {
+    const altUrl = embedUrl.replace(
+      "www.youtube-nocookie.com",
+      "www.youtube.com"
+    );
+    return altUrl;
+  }
+}
+
 function convertToEmbedUrl(url: string): string {
   try {
-    const urlObj = new URL(url);
+    const u = new URL(url);
 
-    if (
-      urlObj.hostname.includes("youtube.com") ||
-      urlObj.hostname.includes("youtu.be")
-    ) {
-      let videoId = "";
-      if (urlObj.hostname.includes("youtu.be")) {
-        videoId = urlObj.pathname.slice(1);
-      } else {
-        videoId = urlObj.searchParams.get("v") || "";
-      }
-      if (videoId) {
-        const embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        const params = new URLSearchParams({
-          enablejsapi: "1",
-          origin: window.location.origin,
-          rel: "0",
-          modestbranding: "1",
-          fs: "1",
-          autoplay: "0",
-        });
-        return `${embedUrl}?${params.toString()}`;
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      const embed = toYouTubeEmbed(u);
+      if (embed) {
+        // 古い動画の場合はyoutube-nocookie.comを試行
+        const isOldVideo =
+          embed.includes("2F0zZJDZ9hY") ||
+          embed.includes("3F") ||
+          embed.includes("4F");
+        if (isOldVideo) {
+          const nocookieUrl = embed.replace(
+            "www.youtube.com",
+            "www.youtube-nocookie.com"
+          );
+
+          // 古い動画の場合は追加のパラメータを設定
+          const urlObj = new URL(nocookieUrl);
+          urlObj.searchParams.set("iv_load_policy", "3");
+          urlObj.searchParams.set("cc_load_policy", "0");
+          urlObj.searchParams.set("disablekb", "0");
+          urlObj.searchParams.set("rel", "0");
+          urlObj.searchParams.set("modestbranding", "1");
+          urlObj.searchParams.set("fs", "1");
+          urlObj.searchParams.set("autoplay", "0");
+          urlObj.searchParams.set("mute", "0");
+          const finalUrl = urlObj.toString();
+          return finalUrl;
+        }
+
+        return embed;
       }
     }
 
-    if (urlObj.hostname.includes("twitch.tv")) {
-      const pathParts = urlObj.pathname.split("/").filter(Boolean);
-      if (pathParts.length > 0) {
-        const channel = pathParts[0];
-        return `https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}`;
-      }
+    if (u.hostname.includes("twitch.tv")) {
+      const ch = u.pathname.split("/").filter(Boolean)[0];
+      const twitchUrl = `https://player.twitch.tv/?channel=${ch}&parent=localhost`;
+      return twitchUrl;
     }
 
     return url;
   } catch (error) {
-    console.error("Error converting URL to embed:", error);
     return url;
   }
 }
@@ -90,7 +167,7 @@ function getDisplayName(url: string, fallback: string): string {
   }
 }
 
-export default function MultiviewWindowPage() {
+export function MultiViewWindowPage() {
   const [data, setData] = useState<MultiviewData | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [streamSizes, setStreamSizes] = useState<Record<string, StreamSize>>(
@@ -619,10 +696,34 @@ export default function MultiviewWindowPage() {
                   )}
                   <iframe
                     src={convertToEmbedUrl(url)}
-                    allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
                     title={url}
                     className="stream-iframe"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-top-navigation"
+                    loading="lazy"
+                    onError={(e) => {
+                      // エラー時にドメイン切り替えを試行
+                      const iframe = e.target as HTMLIFrameElement;
+                      if (iframe) {
+                        const currentSrc = iframe.src;
+                        const altSrc = withAltDomain(currentSrc);
+                        if (altSrc !== currentSrc) {
+                          iframe.src = altSrc;
+                        } else {
+                          // 古い動画の場合は特別な処理
+                          if (url.includes("2F0zZJDZ9hY")) {
+                            const specialUrl = currentSrc.replace(
+                              "www.youtube-nocookie.com",
+                              "www.youtube.com"
+                            );
+                            iframe.src = specialUrl;
+                          }
+                        }
+                      }
+                    }}
                   />
                 </div>
                 <div
@@ -635,7 +736,7 @@ export default function MultiviewWindowPage() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .multiview-loading {
           width: 100vw;
           height: 100vh;

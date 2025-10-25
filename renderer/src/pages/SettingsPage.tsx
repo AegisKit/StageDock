@@ -1,14 +1,12 @@
-﻿"use client";
-
-import { useEffect, useState } from "react";
-import { useSetSetting, useSetting } from "../../hooks/use-settings";
+import React, { useEffect, useState } from "react";
+import { useSetSetting, useSetting } from "../hooks/use-settings";
 
 interface SilentHours {
   start: string;
   end: string;
 }
 
-export default function SettingsPage() {
+export function SettingsPage() {
   const { data: silentHours } = useSetting<SilentHours>(
     "notifications.silentHours"
   );
@@ -116,6 +114,14 @@ export default function SettingsPage() {
             />
           </label>
         </div>
+      </div>
+
+      <div className="panel panel-muted">
+        <h2 className="section-title-small">API keys</h2>
+        <p className="misc-note">
+          Store Twitch and YouTube credentials via environment variables or the
+          system credential manager. A dedicated UI is planned.
+        </p>
       </div>
     </div>
   );

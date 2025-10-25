@@ -1,6 +1,4 @@
-"use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, JSX } from "react";
 import type {
   CreatorPlatform,
@@ -12,9 +10,9 @@ import {
   useCreators,
   useDeleteCreator,
   useUpdateCreator,
-} from "../../hooks/use-creators";
-import { useStageDockReady } from "../../hooks/use-stagedock-ready";
-import { getStageDock } from "../../lib/stagedock";
+} from "../hooks/use-creators";
+import { useStageDockReady } from "../hooks/use-stagedock-ready";
+import { getStageDock } from "../lib/stagedock";
 
 const PLATFORM_LABELS: Record<CreatorPlatform, string> = {
   twitch: "Twitch",
@@ -196,7 +194,7 @@ function buildStreamUrl(creator: CreatorWithStatus): string | null {
   return null;
 }
 
-export default function CreatorsPage() {
+export function CreatorsPage() {
   const ready = useStageDockReady();
   const creatorsQuery = useCreators();
   const createMutation = useCreateCreator();
@@ -348,8 +346,7 @@ export default function CreatorsPage() {
   };
 
   const handleOpenStream = useCallback((creator: CreatorWithStatus) => {
-    const targetUrl =
-      creator.liveStatus?.streamUrl ?? buildStreamUrl(creator);
+    const targetUrl = creator.liveStatus?.streamUrl ?? buildStreamUrl(creator);
     if (!targetUrl) {
       return;
     }
@@ -574,7 +571,10 @@ export default function CreatorsPage() {
       <form className="panel" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div>
-            <span className="label" style={{ marginBottom: 8, display: "block" }}>
+            <span
+              className="label"
+              style={{ marginBottom: 8, display: "block" }}
+            >
               Platform
             </span>
             <div
@@ -595,7 +595,9 @@ export default function CreatorsPage() {
                     type="button"
                     onClick={() => handlePlatformSelect(platformValue)}
                     aria-pressed={isActive}
-                    className={`button ${isActive ? "button-primary" : "button-outline"}`}
+                    className={`button ${
+                      isActive ? "button-primary" : "button-outline"
+                    }`}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -881,33 +883,33 @@ export default function CreatorsPage() {
                           <span className="badge badge-offline">Offline</span>
                         )}
                       </td>
-                    <td style={{ textAlign: "left" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "flex-start",
-                          alignItems: "center",
-                          gap: 8,
-                          flexWrap: "wrap",
-                          minWidth: 160,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="button button-outline"
-                          onClick={() => startEditingCreator(creator)}
+                      <td style={{ textAlign: "left" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "flex-start",
+                            alignItems: "center",
+                            gap: 8,
+                            flexWrap: "wrap",
+                            minWidth: 160,
+                          }}
                         >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-danger"
-                          onClick={() => handleDelete(creator)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
+                          <button
+                            type="button"
+                            className="button button-outline"
+                            onClick={() => startEditingCreator(creator)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-danger"
+                            onClick={() => handleDelete(creator)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })

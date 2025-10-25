@@ -19,6 +19,7 @@ win:
     - nsis
   artifactName: StageDock-${version}-win.${ext}
   icon: assets/icon.png
+  asar: false
 nsis:
   oneClick: false
   perMachine: false
