@@ -7,6 +7,20 @@ export function useStageDockReady(): boolean {
   const [ready, setReady] = useState<boolean>(false);
 
   useEffect(() => {
+    // 開発環境では常にtrueを返す（Electronのpreloadスクリプトが利用できない場合）
+    const isDevelopment =
+      typeof window !== "undefined" &&
+      (window.location.href.includes("localhost:3000") ||
+        window.location.href.includes("127.0.0.1:3000"));
+
+    if (isDevelopment) {
+      console.log(
+        "Development environment detected, bypassing StageDock API check"
+      );
+      setReady(true);
+      return;
+    }
+
     // 即座にチェック
     if (isStageDockAvailable()) {
       setReady(true);

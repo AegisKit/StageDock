@@ -68,7 +68,6 @@ function loadEnvFromFile(): void {
 loadEnvFromFile();
 
 const isDevelopment = !app.isPackaged;
-const ELECTRON_RENDERER_URL = process.env.ELECTRON_RENDERER_URL;
 // CommonJSでは__filenameと__dirnameは自動的に利用可能
 let mainWindow: BrowserWindow | null = null;
 function resolvePreloadPath() {
@@ -78,8 +77,9 @@ function resolvePreloadPath() {
 // Reactサーバーは不要 - 静的ファイルを直接読み込み
 
 function resolveMultiviewUrl() {
-  if (isDevelopment && ELECTRON_RENDERER_URL) {
-    return `${ELECTRON_RENDERER_URL}/multiview-window`;
+  if (isDevelopment) {
+    // 開発環境ではReact開発サーバーを使用
+    return `http://localhost:3000/#/multiview-window`;
   }
   const indexPath = path.join(
     app.getAppPath(),
@@ -225,9 +225,10 @@ async function createWindow() {
     if (!mainWindow) return;
 
     try {
-      if (isDevelopment && ELECTRON_RENDERER_URL) {
-        logger.info({ url: ELECTRON_RENDERER_URL }, "Loading development URL");
-        await mainWindow.loadURL(ELECTRON_RENDERER_URL);
+      if (isDevelopment) {
+        // 開発環境ではReact開発サーバーを使用
+        logger.info("Loading development React server");
+        await mainWindow.loadURL("http://localhost:3000");
       } else {
         // 本番環境では静的ファイルを直接読み込み
         logger.info("Loading React static files for production");
