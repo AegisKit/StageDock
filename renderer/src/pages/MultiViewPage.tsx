@@ -18,7 +18,7 @@ function toYouTubeEmbed(urlObj: URL) {
     originalUrl: urlObj.href,
     hostname: host,
     pathname: path,
-    searchParams: Object.fromEntries(urlObj.searchParams.entries())
+    searchParams: Object.fromEntries(urlObj.searchParams.entries()),
   });
 
   // 複雑な処理は一時的に無効化
@@ -44,15 +44,15 @@ function toYouTubeEmbed(urlObj: URL) {
       console.log("📺 /embed形式の動画ID:", id);
     }
   }
-  
+
   if (!id) {
     console.log("❌ 動画IDが取得できませんでした");
     return null;
   }
 
-  const embedUrl = `https://www.youtube.com/embed/${id}`;
+  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0`;
   console.log("✅ 生成された埋め込みURL:", embedUrl);
-  
+
   return embedUrl;
 }
 
@@ -64,13 +64,13 @@ function withAltDomain(embedUrl: string) {
 
 function convertToEmbedUrl(url: string): string {
   console.log("🌐 埋め込みURL変換開始:", url);
-  
+
   try {
     const u = new URL(url);
     console.log("🔗 URL解析結果:", {
       hostname: u.hostname,
       pathname: u.pathname,
-      search: u.search
+      search: u.search,
     });
 
     if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
@@ -265,4 +265,3 @@ export function MultiViewPage() {
     </div>
   );
 }
-
