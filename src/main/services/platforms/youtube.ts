@@ -268,25 +268,8 @@ function parseLiveStatusFromHtml(
         (liveRenderer as { startTimestamp?: string } | null)?.startTimestamp ??
         extractStartTimestamp($) ??
         null;
-      const viewerCount = parseViewCount(
-        videoDetails?.viewCount ??
-          (
-            liveRenderer as {
-              viewerCount?: unknown;
-              liveStream?: { viewerCount?: unknown; activeViewers?: unknown };
-            } | null
-          )?.viewerCount ??
-          (
-            liveRenderer as {
-              liveStream?: { viewerCount?: unknown; activeViewers?: unknown };
-            } | null
-          )?.liveStream?.viewerCount ??
-          (
-            liveRenderer as {
-              liveStream?: { viewerCount?: unknown; activeViewers?: unknown };
-            } | null
-          )?.liveStream?.activeViewers
-      );
+      // YouTubeの視聴者数は常に「-」で表示
+      const viewerCount = null;
 
       return {
         isLive: true,

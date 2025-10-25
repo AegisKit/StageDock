@@ -14,6 +14,169 @@ import {
 import { useStageDockReady } from "../hooks/use-stagedock-ready";
 import { getStageDock } from "../lib/stagedock";
 
+// 配信詳細情報のホバーコンポーネント
+interface StreamDetailsProps {
+  creator: CreatorWithStatus;
+  isVisible: boolean;
+  position: { x: number; y: number };
+}
+
+function StreamDetails({ creator, isVisible, position }: StreamDetailsProps) {
+  if (!isVisible || !creator.liveStatus?.isLive) {
+    return null;
+  }
+
+  const { liveStatus } = creator;
+  const startedAt = liveStatus.startedAt
+    ? new Date(liveStatus.startedAt)
+    : null;
+
+  // 配信時間の表示形式を改善
+  const formatDuration = (startedAt: Date) => {
+    const now = Date.now();
+    const diffMs = now - startedAt.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    if (diffMinutes < 60) {
+      return `${diffMinutes}分`;
+    }
+
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+
+    if (hours < 24) {
+      return minutes > 0 ? `${hours}時間${minutes}分` : `${hours}時間`;
+    }
+
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+
+    if (remainingHours === 0) {
+      return `${days}日`;
+    } else if (minutes === 0) {
+      return `${days}日${remainingHours}時間`;
+    } else {
+      return `${days}日${remainingHours}時間${minutes}分`;
+    }
+  };
+
+  const duration = startedAt ? formatDuration(startedAt) : null;
+
+  return (
+    <div
+      className="stream-details-hover"
+      style={{
+        position: "fixed",
+        left: position.x + 10,
+        top: position.y - 10,
+        zIndex: 1000,
+        background: "#2a2a2a",
+        border: "1px solid #404040",
+        borderRadius: "8px",
+        padding: "12px",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+        minWidth: "280px",
+        maxWidth: "400px",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "8px",
+        }}
+      >
+        {PLATFORM_ICONS[creator.platform]}
+        <span style={{ fontWeight: "bold", color: "#ffffff" }}>
+          {creator.displayName}
+        </span>
+        <span className="badge badge-live" style={{ fontSize: "12px" }}>
+          LIVE
+        </span>
+      </div>
+
+      {liveStatus.title && (
+        <div style={{ marginBottom: "8px" }}>
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: "bold",
+              color: "#ffffff",
+              marginBottom: "4px",
+            }}
+          >
+            配信タイトル
+          </div>
+          <div
+            style={{
+              fontSize: "13px",
+              color: "#cccccc",
+              lineHeight: "1.4",
+            }}
+          >
+            {liveStatus.title}
+          </div>
+        </div>
+      )}
+
+      {liveStatus.game && (
+        <div style={{ marginBottom: "8px" }}>
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: "bold",
+              color: "#ffffff",
+              marginBottom: "4px",
+            }}
+          >
+            ゲーム/カテゴリ
+          </div>
+          <div style={{ fontSize: "13px", color: "#666666" }}>
+            {liveStatus.game}
+          </div>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          gap: "16px",
+          fontSize: "12px",
+          color: "#cccccc",
+        }}
+      >
+        {liveStatus.viewerCount !== null && (
+          <div>
+            <span style={{ fontWeight: "bold" }}>視聴者数: </span>
+            {liveStatus.viewerCount.toLocaleString()}
+          </div>
+        )}
+        {duration !== null && (
+          <div>
+            <span style={{ fontWeight: "bold" }}>配信時間: </span>
+            {duration}
+          </div>
+        )}
+      </div>
+
+      {startedAt && (
+        <div
+          style={{
+            marginTop: "8px",
+            fontSize: "12px",
+            color: "#cccccc",
+          }}
+        >
+          <span style={{ fontWeight: "bold" }}>開始時刻: </span>
+          {startedAt.toLocaleString("ja-JP")}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PLATFORM_LABELS: Record<CreatorPlatform, string> = {
   twitch: "Twitch",
   youtube: "YouTube",
@@ -210,6 +373,14 @@ export function CreatorsPage() {
   const [editState, setEditState] = useState<EditFormState | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // ホバー状態の管理
+  const [hoveredCreator, setHoveredCreator] =
+    useState<CreatorWithStatus | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+
   const creators = creatorsQuery.data ?? [];
   const sortedCreators = useMemo(() => sortCreators(creators), [creators]);
   const onlineCreators = useMemo(
@@ -347,6 +518,30 @@ export function CreatorsPage() {
     }
     void getStageDock().openExternal(targetUrl);
   }, []);
+
+  // ホバーイベントハンドラー
+  const handleMouseEnter = useCallback(
+    (creator: CreatorWithStatus, event: React.MouseEvent) => {
+      if (creator.liveStatus?.isLive) {
+        setHoveredCreator(creator);
+        setHoverPosition({ x: event.clientX, y: event.clientY });
+      }
+    },
+    []
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredCreator(null);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (hoveredCreator) {
+        setHoverPosition({ x: event.clientX, y: event.clientY });
+      }
+    },
+    [hoveredCreator]
+  );
 
   const startEditingCreator = useCallback((creator: CreatorWithStatus) => {
     const normalizedTags = getCreatorTags(creator);
@@ -815,6 +1010,9 @@ export function CreatorsPage() {
                             type="button"
                             style={LIVE_LINK_BUTTON_STYLE}
                             onClick={() => handleOpenStream(creator)}
+                            onMouseEnter={(e) => handleMouseEnter(creator, e)}
+                            onMouseLeave={handleMouseLeave}
+                            onMouseMove={handleMouseMove}
                             aria-label={`Open ${creator.displayName}'s live stream`}
                           >
                             {creator.displayName}
@@ -1019,6 +1217,15 @@ export function CreatorsPage() {
             )}
           </form>
         </div>
+      )}
+
+      {/* 配信詳細情報のホバー表示 */}
+      {hoveredCreator && (
+        <StreamDetails
+          creator={hoveredCreator}
+          isVisible={true}
+          position={hoverPosition}
+        />
       )}
     </div>
   );
