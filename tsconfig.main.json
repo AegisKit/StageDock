@@ -8,7 +8,7 @@
       "@main/*": ["src/main/*"],
       "@common/*": ["src/common/*"]
     },
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "Node",
     "composite": true,
     "declaration": true,
     "declarationDir": "dist/main/types",
