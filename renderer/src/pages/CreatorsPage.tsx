@@ -185,8 +185,8 @@ const PLATFORM_LABELS: Record<CreatorPlatform, string> = {
 const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
   twitch: (
     <svg
-      width="28"
-      height="28"
+      width="36"
+      height="36"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       focusable="false"
@@ -201,8 +201,8 @@ const PLATFORM_ICONS: Record<CreatorPlatform, JSX.Element> = {
   ),
   youtube: (
     <svg
-      width="28"
-      height="28"
+      width="36"
+      height="36"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       focusable="false"
@@ -232,7 +232,7 @@ const UNTAGGED_TAG_VALUE = "__untagged__";
 const UNTAGGED_TAG_LABEL = "Untagged";
 
 function parseTagsInput(value: string): string[] {
-  return Array.from(
+  const tags = Array.from(
     new Set(
       value
         .split(/,|\r?\n/)
@@ -240,6 +240,8 @@ function parseTagsInput(value: string): string[] {
         .filter((tag) => tag.length > 0)
     )
   );
+  // 最大10件に制限
+  return tags.slice(0, 10);
 }
 
 function formatTagsInput(tags: string[]): string {
@@ -330,7 +332,12 @@ function sortCreators(creators: CreatorWithStatus[]): CreatorWithStatus[] {
     if (aLive !== bLive) {
       return bLive - aLive;
     }
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    // 50音順でソート（日本語対応）
+    return a.displayName.localeCompare(b.displayName, "ja", {
+      sensitivity: "base",
+      numeric: true,
+      caseFirst: "lower",
+    });
   });
 }
 
@@ -367,7 +374,8 @@ export function CreatorsPage() {
 
   const [formState, setFormState] = useState<FormState>(DEFAULT_FORM_STATE);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [editingCreator, setEditingCreator] =
     useState<CreatorWithStatus | null>(null);
   const [editState, setEditState] = useState<EditFormState | null>(null);
@@ -440,36 +448,115 @@ export function CreatorsPage() {
 
   const tagFilterOptions = useMemo(
     () =>
-      tagGroups.map(({ key, label, creators }) => ({
-        value: key,
-        label,
-        count: creators.length,
-      })),
+      tagGroups
+        .map(({ key, label, creators }) => ({
+          value: key,
+          label,
+          count: creators.length,
+        }))
+        .sort((a, b) =>
+          a.label.localeCompare(b.label, "ja", {
+            sensitivity: "base",
+            numeric: true,
+            caseFirst: "lower",
+          })
+        ),
     [tagGroups]
   );
 
   useEffect(() => {
-    if (
-      activeTagFilter &&
-      !tagFilterOptions.some((option) => option.value === activeTagFilter)
-    ) {
-      setActiveTagFilter(null);
+    // 無効なタグフィルターをクリア
+    const validFilters = activeTagFilters.filter((filter) =>
+      tagFilterOptions.some((option) => option.value === filter)
+    );
+    if (validFilters.length !== activeTagFilters.length) {
+      setActiveTagFilters(validFilters);
     }
-  }, [activeTagFilter, tagFilterOptions]);
+  }, [activeTagFilters, tagFilterOptions]);
 
   const filteredCreators = useMemo(() => {
-    if (!activeTagFilter) {
+    if (activeTagFilters.length === 0) {
       return sortedCreators;
     }
-    if (activeTagFilter === UNTAGGED_TAG_VALUE) {
-      return sortedCreators.filter(
-        (creator) => getCreatorTags(creator).length === 0
-      );
+
+    return sortedCreators.filter((creator) => {
+      const creatorTags = getCreatorTags(creator);
+
+      // すべての選択されたタグがクリエイターに含まれているかチェック（AND条件）
+      return activeTagFilters.every((filter) => {
+        if (filter === UNTAGGED_TAG_VALUE) {
+          return creatorTags.length === 0;
+        }
+        return creatorTags.includes(filter);
+      });
+    });
+  }, [sortedCreators, activeTagFilters]);
+
+  // 選択されたタグに基づいて利用可能なタグをフィルタリング
+  const availableTagOptions = useMemo(() => {
+    if (activeTagFilters.length === 0) {
+      return tagFilterOptions;
     }
-    return sortedCreators.filter((creator) =>
-      getCreatorTags(creator).includes(activeTagFilter)
-    );
-  }, [sortedCreators, activeTagFilter]);
+
+    // 選択されたタグを持つクリエイターを取得
+    const creatorsWithSelectedTags = sortedCreators.filter((creator) => {
+      const creatorTags = getCreatorTags(creator);
+      return activeTagFilters.every((filter) => {
+        if (filter === UNTAGGED_TAG_VALUE) {
+          return creatorTags.length === 0;
+        }
+        return creatorTags.includes(filter);
+      });
+    });
+
+    // これらのクリエイターが持つタグのみを表示
+    const availableTags = new Set<string>();
+    creatorsWithSelectedTags.forEach((creator) => {
+      getCreatorTags(creator).forEach((tag) => availableTags.add(tag));
+    });
+
+    // Untaggedオプションも含める
+    if (
+      creatorsWithSelectedTags.some(
+        (creator) => getCreatorTags(creator).length === 0
+      )
+    ) {
+      availableTags.add(UNTAGGED_TAG_VALUE);
+    }
+
+    // 各タグについて、現在の条件 + そのタグを持つクリエイター数を計算
+    return tagFilterOptions
+      .filter((option) => availableTags.has(option.value))
+      .map((option) => {
+        // 現在の条件 + そのタグを持つクリエイターをカウント
+        const count = sortedCreators.filter((creator) => {
+          const creatorTags = getCreatorTags(creator);
+
+          // 現在選択されているタグの条件を満たすかチェック
+          const meetsCurrentConditions = activeTagFilters.every((filter) => {
+            if (filter === UNTAGGED_TAG_VALUE) {
+              return creatorTags.length === 0;
+            }
+            return creatorTags.includes(filter);
+          });
+
+          if (!meetsCurrentConditions) {
+            return false;
+          }
+
+          // そのタグも持っているかチェック
+          if (option.value === UNTAGGED_TAG_VALUE) {
+            return creatorTags.length === 0;
+          }
+          return creatorTags.includes(option.value);
+        }).length;
+
+        return {
+          ...option,
+          count,
+        };
+      });
+  }, [tagFilterOptions, activeTagFilters, sortedCreators]);
 
   const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>([]);
   const selectedOnlineCreators = useMemo(
@@ -507,10 +594,6 @@ export function CreatorsPage() {
       setFormState((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
-  const handlePlatformSelect = (platform: CreatorPlatform) => {
-    setFormState((prev) => ({ ...prev, platform }));
-  };
-
   const handleOpenStream = useCallback((creator: CreatorWithStatus) => {
     const targetUrl = creator.liveStatus?.streamUrl ?? buildStreamUrl(creator);
     if (!targetUrl) {
@@ -542,6 +625,56 @@ export function CreatorsPage() {
     },
     [hoveredCreator]
   );
+
+  // タグクリックハンドラー
+  const handleTagClick = useCallback((tag: string) => {
+    setActiveTagFilters((prev) => {
+      if (prev.includes(tag)) {
+        // 既に選択されている場合は削除
+        return prev.filter((t) => t !== tag);
+      } else {
+        // 新しく追加
+        return [...prev, tag];
+      }
+    });
+  }, []);
+
+  // タグフィルターのクリア
+  const clearTagFilters = useCallback(() => {
+    setActiveTagFilters([]);
+  }, []);
+
+  // タグの選択/選択解除
+  const toggleTagFilter = useCallback((tag: string) => {
+    setActiveTagFilters((prev) => {
+      if (prev.includes(tag)) {
+        return prev.filter((t) => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  }, []);
+
+  // ドロップダウンの開閉
+  const toggleTagDropdown = useCallback(() => {
+    setIsTagDropdownOpen((prev) => !prev);
+  }, []);
+
+  // 外部クリックでドロップダウンを閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isTagDropdownOpen && !target.closest(".tag-filter")) {
+        setIsTagDropdownOpen(false);
+      }
+    };
+
+    if (isTagDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isTagDropdownOpen]);
 
   const startEditingCreator = useCallback((creator: CreatorWithStatus) => {
     const normalizedTags = getCreatorTags(creator);
@@ -761,54 +894,6 @@ export function CreatorsPage() {
       <form className="panel" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div>
-            <span
-              className="label"
-              style={{ marginBottom: 8, display: "block" }}
-            >
-              Platform
-            </span>
-            <div
-              role="group"
-              aria-label="Select platform"
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              {Object.entries(PLATFORM_LABELS).map(([value, label]) => {
-                const platformValue = value as CreatorPlatform;
-                const isActive = formState.platform === platformValue;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handlePlatformSelect(platformValue)}
-                    aria-pressed={isActive}
-                    className={`button ${
-                      isActive ? "button-primary" : "button-outline"
-                    }`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 14px",
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{ display: "inline-flex", alignItems: "center" }}
-                    >
-                      {PLATFORM_ICONS[platformValue]}
-                    </span>
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
             <label className="label" htmlFor="channel">
               Channel URL or ID
             </label>
@@ -868,6 +953,7 @@ export function CreatorsPage() {
                 }))
               }
               className="checkbox"
+              style={{ transform: "scale(0.6)" }}
             />
           </label>
           <button
@@ -908,7 +994,14 @@ export function CreatorsPage() {
             <span className="misc-note">
               {creatorsQuery.isLoading
                 ? "Loading..."
-                : `${creators.length} total`}
+                : `${filteredCreators.length} creators`}
+              {activeTagFilters.length > 0 && (
+                <span
+                  style={{ marginLeft: "8px", color: "var(--accent, #007acc)" }}
+                >
+                  (filtered by: {activeTagFilters.join(", ")})
+                </span>
+              )}
             </span>
           </div>
           <button
@@ -929,42 +1022,119 @@ export function CreatorsPage() {
             className="tag-filter"
             style={{
               display: "flex",
-              flexWrap: "wrap",
               alignItems: "center",
-              gap: 8,
+              gap: 12,
               marginBottom: 16,
+              position: "relative",
             }}
           >
-            <span className="misc-note">Filter by tag:</span>
-            <button
-              type="button"
-              className={
-                activeTagFilter === null
-                  ? "button button-primary"
-                  : "button button-outline"
-              }
-              onClick={() => setActiveTagFilter(null)}
+            <label
+              className="label"
+              style={{ marginBottom: 0, whiteSpace: "nowrap" }}
             >
-              All
-            </button>
-            {tagFilterOptions.map((option) => (
+              Filter by tag:
+            </label>
+            <div style={{ position: "relative" }}>
               <button
-                key={option.value}
                 type="button"
-                className={
-                  activeTagFilter === option.value
-                    ? "button button-primary"
-                    : "button button-outline"
-                }
-                onClick={() =>
-                  setActiveTagFilter((prev) =>
-                    prev === option.value ? null : option.value
-                  )
-                }
+                className="button button-outline"
+                onClick={toggleTagDropdown}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  minWidth: "200px",
+                  justifyContent: "space-between",
+                }}
               >
-                {option.label} ({option.count})
+                <span>
+                  {activeTagFilters.length === 0
+                    ? "Select tags..."
+                    : `${activeTagFilters.length} tag(s) selected`}
+                </span>
+                <span
+                  style={{
+                    transform: isTagDropdownOpen
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  ▼
+                </span>
               </button>
-            ))}
+
+              {isTagDropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    backgroundColor: "var(--color-surface-1, #2a2a2a)",
+                    border: "1px solid var(--color-border, #404040)",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    zIndex: 1000,
+                    maxHeight: "300px",
+                    overflowY: "auto",
+                    marginTop: "4px",
+                  }}
+                >
+                  {availableTagOptions.map((option) => (
+                    <label
+                      key={option.value}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        backgroundColor: activeTagFilters.includes(option.value)
+                          ? "var(--accent, #007acc)"
+                          : "transparent",
+                        color: activeTagFilters.includes(option.value)
+                          ? "white"
+                          : "inherit",
+                        transition: "background-color 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!activeTagFilters.includes(option.value)) {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-surface-2, #404040)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!activeTagFilters.includes(option.value)) {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={activeTagFilters.includes(option.value)}
+                        onChange={() => toggleTagFilter(option.value)}
+                        style={{ margin: 0 }}
+                      />
+                      <span style={{ flex: 1 }}>
+                        {option.label} ({option.count})
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {activeTagFilters.length > 0 && (
+              <button
+                type="button"
+                className="button button-outline button-sm"
+                onClick={clearTagFilters}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                Clear ({activeTagFilters.length})
+              </button>
+            )}
           </div>
         )}
         <div className="table-wrapper">
@@ -974,7 +1144,6 @@ export function CreatorsPage() {
                 <th style={{ textAlign: "center" }}>Select</th>
                 <th>Display name</th>
                 <th style={{ textAlign: "center" }}>Platform</th>
-                <th>Channel ID</th>
                 <th>Tags</th>
                 <th>Notification</th>
                 <th>Status</th>
@@ -984,9 +1153,9 @@ export function CreatorsPage() {
             <tbody>
               {filteredCreators.length === 0 && !creatorsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
-                    {activeTagFilter
-                      ? "No creators match the selected tag."
+                  <td colSpan={7} className="table-empty">
+                    {activeTagFilters.length > 0
+                      ? "No creators match the selected tags."
                       : "No creators yet. Use the form above to add one."}
                   </td>
                 </tr>
@@ -1002,6 +1171,7 @@ export function CreatorsPage() {
                           onChange={() => toggleCreatorSelection(creator.id)}
                           disabled={!creator.liveStatus?.isLive}
                           aria-label={`Select ${creator.displayName} for Multi-view`}
+                          style={{ transform: "scale(1.3)" }}
                         />
                       </td>
                       <td>
@@ -1015,10 +1185,18 @@ export function CreatorsPage() {
                             onMouseMove={handleMouseMove}
                             aria-label={`Open ${creator.displayName}'s live stream`}
                           >
-                            {creator.displayName}
+                            <span
+                              style={{ fontSize: "16px", fontWeight: "bold" }}
+                            >
+                              {creator.displayName}
+                            </span>
                           </button>
                         ) : (
-                          creator.displayName
+                          <span
+                            style={{ fontSize: "16px", fontWeight: "bold" }}
+                          >
+                            {creator.displayName}
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: "center" }}>
@@ -1030,7 +1208,6 @@ export function CreatorsPage() {
                           {PLATFORM_ICONS[creator.platform]}
                         </span>
                       </td>
-                      <td>{creator.channelId}</td>
                       <td>
                         {normalizedTags.length > 0 ? (
                           <div
@@ -1047,7 +1224,30 @@ export function CreatorsPage() {
                                 style={{
                                   padding: "2px 6px",
                                   borderRadius: 4,
-                                  background: "var(--color-surface-3, #1f1f1f)",
+                                  background: activeTagFilters.includes(tag)
+                                    ? "var(--accent, #007acc)"
+                                    : "var(--color-surface-3, #1f1f1f)",
+                                  color: activeTagFilters.includes(tag)
+                                    ? "white"
+                                    : "inherit",
+                                  cursor: "pointer",
+                                  userSelect: "none",
+                                  transition:
+                                    "background-color 0.2s ease, color 0.2s ease",
+                                }}
+                                onClick={() => handleTagClick(tag)}
+                                title={`Click to filter by "${tag}"`}
+                                onMouseEnter={(e) => {
+                                  if (!activeTagFilters.includes(tag)) {
+                                    e.currentTarget.style.background =
+                                      "var(--color-surface-2, #2a2a2a)";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!activeTagFilters.includes(tag)) {
+                                    e.currentTarget.style.background =
+                                      "var(--color-surface-3, #1f1f1f)";
+                                  }
                                 }}
                               >
                                 {tag}
@@ -1197,6 +1397,7 @@ export function CreatorsPage() {
                     handleEditToggleNotify(event.target.checked)
                   }
                   className="checkbox"
+                  style={{ transform: "scale(0.8)" }}
                 />
                 Enable notifications
               </label>
