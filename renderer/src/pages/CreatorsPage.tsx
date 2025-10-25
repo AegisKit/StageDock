@@ -312,13 +312,8 @@ export function CreatorsPage() {
   useEffect(() => {
     setSelectedCreatorIds((prev) => {
       const activeIds = onlineCreators.map((creator) => creator.id);
-      const next = prev.filter((id) => activeIds.includes(id));
-      activeIds.forEach((id) => {
-        if (!next.includes(id)) {
-          next.push(id);
-        }
-      });
-      return next;
+      // 既存の選択を維持し、削除されたクリエイターのみ除外
+      return prev.filter((id) => activeIds.includes(id));
     });
   }, [onlineCreators]);
 
