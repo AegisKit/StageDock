@@ -216,6 +216,8 @@ async function createWindow() {
 
   mainWindow.on("ready-to-show", () => {
     mainWindow?.show();
+    // アプリ起動時に最大化ウィンドウで起動
+    mainWindow?.maximize();
   });
   mainWindow.on("closed", () => {
     mainWindow = null;

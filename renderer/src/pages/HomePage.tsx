@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useCreators } from "../hooks/use-creators";
+import { useI18n } from "../hooks/use-i18n";
 
 export function HomePage() {
+  const { t } = useI18n();
   const creatorsQuery = useCreators();
 
   const creators = creatorsQuery.data ?? [];
@@ -16,42 +18,41 @@ export function HomePage() {
     <div className="section">
       <div className="panel">
         <div className="section-heading">
-          <h1 className="section-title">StageDock dashboard</h1>
-          <p className="section-description">
-            Quick overview of your creators and saved layouts. Jump to each
-            feature using the shortcuts on the right.
-          </p>
+          <h1 className="section-title">{t("dashboard.title")}</h1>
+          <p className="section-description">{t("dashboard.description")}</p>
         </div>
         <div className="metric-grid">
           <div className="metric-card">
-            <span className="metric-label">Creators</span>
+            <span className="metric-label">{t("creators.title")}</span>
             <p className="metric-value">{creators.length}</p>
-            <p className="metric-caption">Registered creators</p>
+            <p className="metric-caption">
+              {t("dashboard.registeredCreators")}
+            </p>
           </div>
           <div className="metric-card">
-            <span className="metric-label">Live now</span>
+            <span className="metric-label">{t("dashboard.liveNow")}</span>
             <p className="metric-value">{liveCount}</p>
-            <p className="metric-caption">Currently online</p>
+            <p className="metric-caption">{t("dashboard.currentlyOnline")}</p>
           </div>
         </div>
       </div>
 
       <div className="panel">
         <div className="section-heading">
-          <h2 className="section-title-small">Quick actions</h2>
+          <h2 className="section-title-small">{t("dashboard.quickActions")}</h2>
           <p className="section-description">
-            Frequent entry points to manage your multi-stream workflow.
+            {t("dashboard.quickActionsDescription")}
           </p>
         </div>
         <div className="action-list">
           <Link to="/favorites" className="action-link">
-            Manage creators
+            {t("dashboard.manageCreators")}
           </Link>
           <Link to="/multiview" className="action-link">
-            Build or restore a multi-view layout
+            {t("dashboard.buildMultiview")}
           </Link>
           <Link to="/settings" className="action-link">
-            Configure notifications and updates
+            {t("dashboard.configureSettings")}
           </Link>
         </div>
       </div>
