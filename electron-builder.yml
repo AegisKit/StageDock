@@ -3,7 +3,8 @@ productName: StageDock
 publish:
   provider: github
   owner: AegisKit
-  repo: stagedock
+  repo: StageDock
+  
 directories:
   output: dist/electron
   buildResources: build
