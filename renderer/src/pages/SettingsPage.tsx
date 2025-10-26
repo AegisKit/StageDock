@@ -83,7 +83,13 @@ export function SettingsPage() {
     setIsCheckingUpdate(true);
     try {
       const result = await getStageDock().update.check();
-      console.log("Update check result:", result);
+      console.log("Update check result:", {
+        hasUpdateInfo: !!result?.updateInfo,
+        version: result?.updateInfo?.version,
+        releaseName: result?.updateInfo?.releaseName,
+        hasDownloadPromise: !!result?.downloadPromise,
+        hasCancellationToken: !!result?.cancellationToken,
+      });
       // アップデートが利用可能な場合は通知が自動で表示される
     } catch (error) {
       console.error("Update check failed:", error);
