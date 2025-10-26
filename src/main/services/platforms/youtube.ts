@@ -1,5 +1,6 @@
 import { request } from "undici";
 import { load, type CheerioAPI } from "cheerio";
+import { logger } from "../../utils/logger";
 
 export interface YouTubeLiveStatus {
   isLive: boolean;
@@ -17,6 +18,7 @@ const channelIdCache = new Map<string, string | null>();
 export async function fetchYouTubeLiveStatus(
   channelIdOrHandle: string
 ): Promise<YouTubeLiveStatus | null> {
+  logger.info(`YouTube: Starting live status check for ${channelIdOrHandle}`);
   try {
     const channelId = await resolveChannelId(channelIdOrHandle);
     if (!channelId) {
@@ -231,12 +233,14 @@ function parseLiveStatusFromHtml(
   html: string,
   sourceUrl: string
 ): YouTubeLiveStatus | null {
+  logger.info(`YouTube: Parsing live status from HTML for ${sourceUrl}`);
   const $ = load(html);
   const player = extractJsonBlock<any>(
     html,
     /ytInitialPlayerResponse\s*=\s*(\{[\s\S]*?\});/
   );
 
+  logger.info(`YouTube: Player object found: ${player ? "yes" : "no"}`);
   if (player) {
     const liveDetails =
       player?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails ??
@@ -246,12 +250,27 @@ function parseLiveStatusFromHtml(
       null;
     const videoDetails = player?.videoDetails ?? null;
 
+    // 公開予定の動画を除外
+    const isUpcoming = Boolean(
+      liveDetails?.isUpcoming ||
+        videoDetails?.isUpcoming ||
+        (videoDetails as any)?.liveBroadcastContent === "upcoming"
+    );
+
+    if (isUpcoming) {
+      logger.info(
+        "YouTube: Found upcoming live stream in player object, excluding from live status"
+      );
+      return null;
+    }
+
     const isLive =
       Boolean(liveDetails?.isLiveNow) ||
       Boolean(liveDetails?.isLive) ||
       Boolean(videoDetails?.isLiveContent) ||
       Boolean((liveRenderer as { isLive?: boolean } | null)?.isLive);
 
+    logger.info(`YouTube: Player-based live check result: ${isLive}`);
     if (isLive) {
       const videoId =
         extractVideoId(videoDetails) ??
@@ -283,6 +302,7 @@ function parseLiveStatusFromHtml(
     }
   }
 
+  logger.info("YouTube: No player object found, checking overlay and document");
   const overlayCandidate = findLiveVideoFromOverlay($);
   if (overlayCandidate) {
     return {
@@ -299,9 +319,12 @@ function parseLiveStatusFromHtml(
     return null;
   }
 
+  logger.info("YouTube: About to call isLiveFromDocument");
   if (!isLiveFromDocument($, html)) {
+    logger.info("YouTube: isLiveFromDocument returned false");
     return null;
   }
+  logger.info("YouTube: isLiveFromDocument returned true");
 
   return {
     isLive: true,
@@ -525,6 +548,9 @@ function normalizeTimestamp(value?: string | null): string | null {
 }
 
 function isLiveFromDocument($: CheerioAPI, rawHtml: string): boolean {
+  logger.info("YouTube: Checking live status from document");
+  logger.info(`YouTube: Raw HTML length: ${rawHtml.length}`);
+
   const metaValues = [
     $("meta[itemprop='isLiveBroadcast']").attr("content"),
     $("meta[property='og:video:live_broadcast']").attr("content"),
@@ -551,21 +577,65 @@ function isLiveFromDocument($: CheerioAPI, rawHtml: string): boolean {
       if (!content) {
         return false;
       }
-      return (
-        /"isLive":\s*true/.test(content) ||
-        /"isLiveContent":\s*true/.test(content) ||
-        /"isLiveNow":\s*true/.test(content)
+
+      // デバッグ用：コンテンツの一部をログに出力（最初の500文字）
+      logger.info(
+        `YouTube: Script content sample: ${content.substring(0, 500)}...`
       );
+
+      // 公開予定の動画を除外
+      if (/"liveBroadcastContent":\s*"upcoming"/.test(content)) {
+        logger.info(
+          "YouTube: Found upcoming live stream, excluding from live status"
+        );
+        return false;
+      }
+
+      // 実際にライブ配信中かチェック
+      const isLivePatterns = [
+        { pattern: /"isLive":\s*true/, name: "isLive" },
+        { pattern: /"isLiveContent":\s*true/, name: "isLiveContent" },
+        { pattern: /"isLiveNow":\s*true/, name: "isLiveNow" },
+        {
+          pattern: /"liveBroadcastContent":\s*"live"/,
+          name: "liveBroadcastContent: live",
+        },
+      ];
+
+      const matchedPatterns = isLivePatterns.filter((p) =>
+        p.pattern.test(content)
+      );
+      const isLive = matchedPatterns.length > 0;
+
+      if (isLive) {
+        logger.info(
+          `YouTube: Found live stream indicators: ${matchedPatterns
+            .map((p) => p.name)
+            .join(", ")}`
+        );
+      } else {
+        logger.info(
+          "YouTube: No live stream indicators found in script content"
+        );
+      }
+
+      return isLive;
     });
 
   if (scriptIndicators) {
     return true;
   }
 
+  // 公開予定の動画を除外
+  if (/"liveBroadcastContent":\s*"upcoming"/.test(rawHtml)) {
+    return false;
+  }
+
   return (
     /"isLive":\s*true/.test(rawHtml) ||
     /"isLiveContent":\s*true/.test(rawHtml) ||
-    /"isLiveNow":\s*true/.test(rawHtml)
+    /"isLiveNow":\s*true/.test(rawHtml) ||
+    /"liveBroadcastContent":\s*"live"/.test(rawHtml)
   );
 }
 
