@@ -28,6 +28,10 @@ const IPC_CHANNELS = {
   SETTINGS_SET: "settings:set",
   MULTIVIEW_OPEN: "multiview:open",
   MULTIVIEW_CLOSE: "multiview:close",
+  APP_VERSION: "app:version",
+  UPDATE_CHECK: "update:check",
+  UPDATE_DOWNLOAD: "update:download",
+  UPDATE_INSTALL: "update:install",
 } as const;
 
 export type StageDockAPI = {
@@ -59,6 +63,14 @@ export type StageDockAPI = {
   multiview: {
     open: (urls: string[], layout: string) => Promise<void>;
     close: () => Promise<void>;
+  };
+  app: {
+    getVersion: () => Promise<string>;
+  };
+  update: {
+    check: () => Promise<any>;
+    download: () => Promise<{ success: boolean }>;
+    install: () => Promise<{ success: boolean }>;
   };
 };
 
@@ -148,6 +160,22 @@ const api: StageDockAPI = {
     },
     close: async () => {
       return await ipcRenderer.invoke(IPC_CHANNELS.MULTIVIEW_CLOSE);
+    },
+  },
+  app: {
+    getVersion: async () => {
+      return await ipcRenderer.invoke(IPC_CHANNELS.APP_VERSION);
+    },
+  },
+  update: {
+    check: async () => {
+      return await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK);
+    },
+    download: async () => {
+      return await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD);
+    },
+    install: async () => {
+      return await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL);
     },
   },
 };

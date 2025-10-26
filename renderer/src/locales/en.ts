@@ -118,6 +118,11 @@ export default {
     languageDescription: "Select the language for the user interface.",
     japanese: "日本語",
     english: "English",
+    appInfo: "App Information",
+    version: "Version",
+    loading: "Loading...",
+    checkUpdate: "Check for Updates",
+    checkingUpdate: "Checking...",
   },
   favorites: {
     title: "Favorites",

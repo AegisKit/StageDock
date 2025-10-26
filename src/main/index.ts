@@ -1,5 +1,5 @@
 ﻿import { app, BrowserWindow, ipcMain, nativeTheme, shell } from "electron";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 // import { fileURLToPath } from "node:url";
@@ -12,6 +12,18 @@ import { StageDockDatabase } from "./database/database.js";
 import { registerIpcHandlers } from "./services/ipc/handlers.js";
 import { NotificationService } from "./services/notification.js";
 import { LiveMonitor } from "./services/live-monitor.js";
+
+// デバッグ用のログファイルを作成
+const debugLogPath = path.join(process.cwd(), "debug.log");
+const logToFile = (message: string) => {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  try {
+    writeFileSync(debugLogPath, logMessage, { flag: "a" });
+  } catch (error) {
+    console.error("Failed to write debug log:", error);
+  }
+};
 
 // グローバル変数でリソースを管理
 let database: StageDockDatabase | null = null;
@@ -185,6 +197,7 @@ export { createMultiviewWindow, multiviewWindow };
 //   return `file://${indexPath}`;
 // }
 async function createWindow() {
+  console.log("Creating main window...");
   const preloadPath = resolvePreloadPath();
   console.log("Preload script path:", preloadPath);
   logger.info({ preloadPath }, "Preload script path");
@@ -229,10 +242,12 @@ async function createWindow() {
     try {
       if (isDevelopment) {
         // 開発環境ではReact開発サーバーを使用
+        console.log("Loading development React server...");
         logger.info("Loading development React server");
         await mainWindow.loadURL("http://localhost:3000");
       } else {
         // 本番環境では静的ファイルを直接読み込み
+        console.log("Loading React static files for production...");
         logger.info("Loading React static files for production");
         const indexPath = path.join(
           app.getAppPath(),
@@ -240,14 +255,18 @@ async function createWindow() {
           "renderer",
           "index.html"
         );
+        console.log("Looking for renderer at:", indexPath);
         if (existsSync(indexPath)) {
+          console.log("Renderer file found, loading...");
           logger.info({ indexPath }, "Loading renderer from static file");
           await mainWindow.loadURL(`file://${indexPath}`);
         } else {
+          console.error("Renderer file not found at:", indexPath);
           throw new Error("No renderer files found");
         }
       }
     } catch (error) {
+      console.error("Failed to load renderer:", error);
       logger.error({ error }, "Failed to load renderer completely");
       // 最終的なフォールバック: エラーページ
       await mainWindow.loadURL(
@@ -293,12 +312,124 @@ async function createWindow() {
     }
   }
 }
+function setupAutoUpdater() {
+  // アップデートチェックの設定（エラーハンドリング付き）
+  try {
+    autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+      // 404エラーは無視
+      if (error.message && error.message.includes("404")) {
+        logger.warn(
+          { error },
+          "Update repository not found (404) - skipping auto-update"
+        );
+        return;
+      }
+      logger.error({ error }, "Failed to check for updates");
+    });
+  } catch (error) {
+    logger.error({ error }, "Failed to setup auto-updater");
+  }
+
+  // アップデートが利用可能になったとき
+  autoUpdater.on("update-available", (info) => {
+    logger.info({ version: info.version }, "Update available");
+
+    if (notificationService) {
+      notificationService.showUpdateNotification({
+        version: info.version,
+        releaseNotes: info.releaseNotes ? String(info.releaseNotes) : undefined,
+        onDownload: () => {
+          logger.info("User requested update download");
+          autoUpdater.downloadUpdate();
+        },
+      });
+    }
+  });
+
+  // アップデートのダウンロードが完了したとき
+  autoUpdater.on("update-downloaded", (info) => {
+    logger.info({ version: info.version }, "Update downloaded");
+
+    if (notificationService) {
+      notificationService.showUpdateDownloadedNotification({
+        version: info.version,
+        onInstall: () => {
+          logger.info("User requested update installation");
+          autoUpdater.quitAndInstall();
+        },
+        onRestartLater: () => {
+          logger.info("User chose to restart later");
+        },
+      });
+    }
+  });
+
+  // エラーハンドリング - 404エラーは無視
+  autoUpdater.on("error", (error) => {
+    // GitHubリポジトリが存在しない場合の404エラーは無視
+    if (error.message && error.message.includes("404")) {
+      logger.warn(
+        { error },
+        "Update repository not found (404) - skipping auto-update"
+      );
+      return;
+    }
+    logger.error({ error }, "Auto updater error");
+  });
+
+  // ダウンロード進行状況
+  autoUpdater.on("download-progress", (progressObj) => {
+    logger.debug(
+      {
+        percent: progressObj.percent,
+        transferred: progressObj.transferred,
+        total: progressObj.total,
+      },
+      "Download progress"
+    );
+  });
+}
+
 function registerCoreIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL, async (_event, targetUrl) => {
     await shell.openExternal(targetUrl);
   });
   ipcMain.handle(IPC_CHANNELS.QUIT, () => {
     app.quit();
+  });
+  ipcMain.handle(IPC_CHANNELS.APP_VERSION, () => {
+    return app.getVersion();
+  });
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
+    if (isDevelopment) {
+      throw new Error("Update check is not available in development mode");
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return result;
+    } catch (error) {
+      logger.error({ error }, "Manual update check failed");
+      throw error;
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DOWNLOAD, async () => {
+    if (isDevelopment) {
+      throw new Error("Update download is not available in development mode");
+    }
+    try {
+      await autoUpdater.downloadUpdate();
+      return { success: true };
+    } catch (error) {
+      logger.error({ error }, "Manual update download failed");
+      throw error;
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.UPDATE_INSTALL, () => {
+    if (isDevelopment) {
+      throw new Error("Update install is not available in development mode");
+    }
+    autoUpdater.quitAndInstall();
+    return { success: true };
   });
 }
 
@@ -359,15 +490,20 @@ function setupSignalHandlers() {
   });
 }
 async function initializeApp() {
+  logToFile("Starting StageDock initialization...");
+  console.log("Starting StageDock initialization...");
   try {
     // シグナルハンドラーを最初に設定
+    logToFile("Setting up signal handlers...");
     setupSignalHandlers();
 
     if (!app.requestSingleInstanceLock()) {
+      logToFile("Single instance lock failed, quitting...");
       app.quit();
       return;
     }
 
+    logToFile("Setting up app event handlers...");
     app.on("second-instance", () => {
       if (mainWindow) {
         if (mainWindow.isMinimized()) {
@@ -393,23 +529,32 @@ async function initializeApp() {
       cleanup();
     });
 
+    logToFile("Waiting for app to be ready...");
     await app.whenReady();
+    logToFile("App is ready, initializing database...");
+    console.log("App is ready, initializing database...");
     database = await StageDockDatabase.create();
+    logToFile("Database initialized, creating services...");
+    console.log("Database initialized, creating services...");
     notificationService = new NotificationService();
     liveMonitor = new LiveMonitor(database, notificationService);
     liveMonitor.start();
+    logToFile("Services started, registering IPC handlers...");
+    console.log("Services started, registering IPC handlers...");
     registerIpcHandlers(database);
     registerCoreIpcHandlers();
+    logToFile("IPC handlers registered, creating window...");
+    console.log("IPC handlers registered, creating window...");
     await createWindow();
+    logToFile("Window created successfully");
+    console.log("Window created successfully");
 
     if (!isDevelopment) {
-      try {
-        await autoUpdater.checkForUpdatesAndNotify();
-      } catch (error) {
-        logger.warn({ error }, "Auto update check failed");
-      }
+      setupAutoUpdater();
     }
   } catch (error) {
+    logToFile(`FATAL ERROR during initialization: ${error}`);
+    console.error("FATAL ERROR during initialization:", error);
     logger.fatal(
       { error, stack: error instanceof Error ? error.stack : undefined },
       "Failed to initialize app"
@@ -418,7 +563,10 @@ async function initializeApp() {
     app.exit(1);
   }
 }
+
 initializeApp().catch((error) => {
+  logToFile(`BOOTSTRAP ERROR: ${error}`);
+  console.error("BOOTSTRAP ERROR:", error);
   logger.fatal(
     { error, stack: error instanceof Error ? error.stack : undefined },
     "Failed to bootstrap application"

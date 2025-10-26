@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSetSetting, useSetting } from "../hooks/use-settings";
 import { useI18n } from "../hooks/use-i18n";
+import { getStageDock, isStageDockAvailable } from "../lib/stagedock";
 
 type Language = "ja" | "en";
 
@@ -25,6 +26,8 @@ export function SettingsPage() {
   const [localAutoUpdate, setLocalAutoUpdate] = useState(true);
   const [localLanguage, setLocalLanguage] = useState<Language>("ja");
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   useEffect(() => {
     if (silentHours) {
@@ -44,6 +47,21 @@ export function SettingsPage() {
     }
   }, [language]);
 
+  // アプリバージョンを取得
+  useEffect(() => {
+    const fetchVersion = async () => {
+      if (isStageDockAvailable()) {
+        try {
+          const version = await getStageDock().app.getVersion();
+          setAppVersion(version);
+        } catch (error) {
+          console.error("Failed to get app version:", error);
+        }
+      }
+    };
+    fetchVersion();
+  }, []);
+
   const handleSilentHoursChange =
     (field: keyof SilentHours) => (value: string) => {
       const next = { ...localSilentHours, [field]: value } as SilentHours;
@@ -57,6 +75,21 @@ export function SettingsPage() {
   const handleAutoUpdateToggle = (checked: boolean) => {
     setLocalAutoUpdate(checked);
     void setSetting.mutateAsync({ key: "updates.auto", value: checked });
+  };
+
+  const handleCheckUpdate = async () => {
+    if (!isStageDockAvailable()) return;
+
+    setIsCheckingUpdate(true);
+    try {
+      const result = await getStageDock().update.check();
+      console.log("Update check result:", result);
+      // アップデートが利用可能な場合は通知が自動で表示される
+    } catch (error) {
+      console.error("Update check failed:", error);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
   };
 
   const handleLanguageChange = async (newLanguage: Language) => {
@@ -191,6 +224,32 @@ export function SettingsPage() {
               <span>🇺🇸</span>
               <span>{t("settings.english")}</span>
               {isSavingLanguage && localLanguage === "en" && <span>...</span>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <h2 className="section-title-small">{t("settings.appInfo")}</h2>
+        <div className="form-actions">
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div>
+              <p className="misc-note" style={{ margin: 0 }}>
+                {t("settings.version")}: {appVersion || t("settings.loading")}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={handleCheckUpdate}
+              disabled={isCheckingUpdate}
+              style={{
+                opacity: isCheckingUpdate ? 0.6 : 1,
+              }}
+            >
+              {isCheckingUpdate
+                ? t("settings.checkingUpdate")
+                : t("settings.checkUpdate")}
             </button>
           </div>
         </div>
