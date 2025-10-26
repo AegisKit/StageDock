@@ -399,7 +399,16 @@ async function checkForUpdatesCustom() {
     const response = await fetch(
       "https://api.github.com/repos/AegisKit/StageDock/releases/latest"
     );
+
     if (!response.ok) {
+      if (response.status === 401) {
+        logger.warn(
+          "GitHub API authentication failed, falling back to standard updater"
+        );
+        // 認証エラーの場合は標準のelectron-updaterを使用
+        autoUpdater.checkForUpdates();
+        return;
+      }
       logger.warn({ status: response.status }, "Failed to fetch release info");
       return;
     }
@@ -426,7 +435,12 @@ async function checkForUpdatesCustom() {
       }
     }
   } catch (error) {
-    logger.error({ error }, "Custom update check failed");
+    logger.error(
+      { error },
+      "Custom update check failed, falling back to standard updater"
+    );
+    // エラーの場合は標準のelectron-updaterを使用
+    autoUpdater.checkForUpdates();
   }
 }
 
