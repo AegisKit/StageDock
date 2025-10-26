@@ -313,22 +313,8 @@ async function createWindow() {
   }
 }
 function setupAutoUpdater() {
-  // アップデートチェックの設定（エラーハンドリング付き）
-  try {
-    autoUpdater.checkForUpdatesAndNotify().catch((error) => {
-      // 404エラーは無視
-      if (error.message && error.message.includes("404")) {
-        logger.warn(
-          { error },
-          "Update repository not found (404) - skipping auto-update"
-        );
-        return;
-      }
-      logger.error({ error }, "Failed to check for updates");
-    });
-  } catch (error) {
-    logger.error({ error }, "Failed to setup auto-updater");
-  }
+  // アップデートチェックの設定
+  autoUpdater.checkForUpdatesAndNotify();
 
   // アップデートが利用可能になったとき
   autoUpdater.on("update-available", (info) => {
@@ -364,16 +350,8 @@ function setupAutoUpdater() {
     }
   });
 
-  // エラーハンドリング - 404エラーは無視
+  // エラーハンドリング
   autoUpdater.on("error", (error) => {
-    // GitHubリポジトリが存在しない場合の404エラーは無視
-    if (error.message && error.message.includes("404")) {
-      logger.warn(
-        { error },
-        "Update repository not found (404) - skipping auto-update"
-      );
-      return;
-    }
     logger.error({ error }, "Auto updater error");
   });
 
