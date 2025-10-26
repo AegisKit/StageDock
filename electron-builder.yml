@@ -19,7 +19,7 @@ win:
   target:
     - nsis
   artifactName: StageDock-${version}-win.${ext}
-  icon: assets/icon.png
+  icon: assets/icons/icon-256x256.png # 256pxアイコンを使用
   asar: false
 nsis:
   oneClick: false
