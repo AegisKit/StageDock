@@ -4,6 +4,7 @@ publish:
   provider: github
   owner: AegisKit
   repo: StageDock
+  
   releaseType: release
 directories:
   output: dist/electron
