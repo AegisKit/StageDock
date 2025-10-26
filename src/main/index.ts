@@ -396,8 +396,16 @@ function setupAutoUpdater() {
 async function checkForUpdatesCustom() {
   try {
     // GitHub APIを使用してリリース情報を取得
+    const githubToken =
+      "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"; // 実際のトークンに置き換えてください
     const response = await fetch(
-      "https://api.github.com/repos/AegisKit/StageDock/releases/latest"
+      "https://api.github.com/repos/AegisKit/StageDock/releases/latest",
+      {
+        headers: {
+          Authorization: `token ${githubToken}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
     );
 
     if (!response.ok) {
