@@ -83,10 +83,17 @@ export function getStageDock(): StageDockAPI {
         settings: {
           get: async (key: string) => {
             console.log("Mock settings.get:", key);
-            return undefined;
+            // localStorageから設定を取得
+            const stored = localStorage.getItem(`stagedock_setting_${key}`);
+            return stored ? JSON.parse(stored) : undefined;
           },
           set: async (key: string, value: any) => {
             console.log("Mock settings.set:", key, value);
+            // localStorageに設定を保存
+            localStorage.setItem(
+              `stagedock_setting_${key}`,
+              JSON.stringify(value)
+            );
             return { key, value };
           },
         },

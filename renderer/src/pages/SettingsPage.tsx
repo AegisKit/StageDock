@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useSetSetting, useSetting } from "../hooks/use-settings";
+import { useI18n } from "../hooks/use-i18n";
+
+type Language = "ja" | "en";
 
 interface SilentHours {
   start: string;
@@ -7,10 +10,12 @@ interface SilentHours {
 }
 
 export function SettingsPage() {
+  const { t } = useI18n();
   const { data: silentHours } = useSetting<SilentHours>(
     "notifications.silentHours"
   );
   const { data: autoUpdateEnabled } = useSetting<boolean>("updates.auto", true);
+  const { data: language } = useSetting<Language>("ui.language", "ja");
   const setSetting = useSetSetting();
 
   const [localSilentHours, setLocalSilentHours] = useState<SilentHours>({
@@ -18,6 +23,7 @@ export function SettingsPage() {
     end: "08:00",
   });
   const [localAutoUpdate, setLocalAutoUpdate] = useState(true);
+  const [localLanguage, setLocalLanguage] = useState<Language>("ja");
 
   useEffect(() => {
     if (silentHours) {
@@ -30,6 +36,12 @@ export function SettingsPage() {
       setLocalAutoUpdate(autoUpdateEnabled);
     }
   }, [autoUpdateEnabled]);
+
+  useEffect(() => {
+    if (language) {
+      setLocalLanguage(language);
+    }
+  }, [language]);
 
   const handleSilentHoursChange =
     (field: keyof SilentHours) => (value: string) => {
@@ -46,26 +58,25 @@ export function SettingsPage() {
     void setSetting.mutateAsync({ key: "updates.auto", value: checked });
   };
 
+  const handleLanguageChange = (newLanguage: Language) => {
+    setLocalLanguage(newLanguage);
+    void setSetting.mutateAsync({ key: "ui.language", value: newLanguage });
+  };
+
   return (
     <div className="section">
       <div className="section-heading">
-        <h1 className="section-title">Settings</h1>
-        <p className="section-description">
-          Manage notification windows, auto updates, and integration
-          placeholders.
-        </p>
+        <h1 className="section-title">{t("settings.title")}</h1>
+        <p className="section-description">{t("settings.description")}</p>
       </div>
 
       <div className="panel">
-        <h2 className="section-title-small">Quiet hours</h2>
-        <p className="misc-note">
-          Suppress start notifications during the selected window, using 24-hour
-          format.
-        </p>
+        <h2 className="section-title-small">{t("settings.quietHours")}</h2>
+        <p className="misc-note">{t("settings.quietHoursDescription")}</p>
         <div className="form-grid" style={{ maxWidth: 420 }}>
           <div>
             <label className="label" htmlFor="quiet-from">
-              From
+              {t("settings.from")}
             </label>
             <input
               id="quiet-from"
@@ -79,7 +90,7 @@ export function SettingsPage() {
           </div>
           <div>
             <label className="label" htmlFor="quiet-to">
-              To
+              {t("settings.to")}
             </label>
             <input
               id="quiet-to"
@@ -95,17 +106,16 @@ export function SettingsPage() {
       </div>
 
       <div className="panel">
-        <h2 className="section-title-small">Auto updates</h2>
+        <h2 className="section-title-small">{t("settings.autoUpdates")}</h2>
         <div className="form-actions">
           <p className="section-description" style={{ margin: 0 }}>
-            Check for StageDock releases automatically and install them in the
-            background.
+            {t("settings.autoUpdatesDescription")}
           </p>
           <label
             className="label"
             style={{ gap: 12, textTransform: "none", letterSpacing: 0 }}
           >
-            <span>Auto update</span>
+            <span>{t("settings.autoUpdate")}</span>
             <input
               type="checkbox"
               checked={localAutoUpdate}
@@ -116,12 +126,55 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel panel-muted">
-        <h2 className="section-title-small">API keys</h2>
-        <p className="misc-note">
-          Store Twitch and YouTube credentials via environment variables or the
-          system credential manager. A dedicated UI is planned.
-        </p>
+      <div className="panel">
+        <h2 className="section-title-small">{t("settings.language")}</h2>
+        <p className="misc-note">{t("settings.languageDescription")}</p>
+        <div className="form-actions">
+          <div
+            role="group"
+            aria-label="Select language"
+            style={{
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              className={`button ${
+                localLanguage === "ja" ? "button-primary" : "button-outline"
+              }`}
+              onClick={() => handleLanguageChange("ja")}
+              aria-pressed={localLanguage === "ja"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 14px",
+              }}
+            >
+              <span>🇯🇵</span>
+              <span>{t("settings.japanese")}</span>
+            </button>
+            <button
+              type="button"
+              className={`button ${
+                localLanguage === "en" ? "button-primary" : "button-outline"
+              }`}
+              onClick={() => handleLanguageChange("en")}
+              aria-pressed={localLanguage === "en"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 14px",
+              }}
+            >
+              <span>🇺🇸</span>
+              <span>{t("settings.english")}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

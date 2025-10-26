@@ -434,42 +434,6 @@ function extractText(value: unknown): string | null {
   return null;
 }
 
-function parseViewCount(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const digits = value.replace(/[^0-9]/g, "");
-    if (!digits) {
-      return null;
-    }
-    const parsed = Number(digits);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  if ("simpleText" in value) {
-    return parseViewCount((value as { simpleText?: unknown }).simpleText);
-  }
-
-  if ("runs" in value && Array.isArray((value as { runs?: unknown }).runs)) {
-    const joined = (value as { runs: Array<{ text?: unknown }> }).runs
-      .map((run) => (typeof run?.text === "string" ? run.text : ""))
-      .join("");
-    return parseViewCount(joined);
-  }
-
-  if ("viewCountText" in value) {
-    return parseViewCount((value as { viewCountText?: unknown }).viewCountText);
-  }
-
-  return null;
-}
-
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&amp;/g, "&")

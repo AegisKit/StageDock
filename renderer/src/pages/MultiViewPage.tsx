@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getStageDock } from "../lib/stagedock";
+import { useI18n } from "../hooks/use-i18n";
 
 function normalizeUrls(input: string) {
   return input
@@ -101,6 +102,7 @@ function convertToEmbedUrl(url: string): string {
 }
 
 export function MultiViewPage() {
+  const { t } = useI18n();
   const [urlsInput, setUrlsInput] = useState("");
   const [streams, setStreams] = useState<string[]>([]);
   const [activeStream, setActiveStream] = useState<string | null>(null);
@@ -182,11 +184,8 @@ export function MultiViewPage() {
   return (
     <div className="section">
       <div className="section-heading">
-        <h1 className="section-title">Multi-view</h1>
-        <p className="section-description">
-          Paste one URL per line and StageDock will build a tailored multi-view
-          window for you.
-        </p>
+        <h1 className="section-title">{t("multiview.title")}</h1>
+        <p className="section-description">{t("multiview.description")}</p>
       </div>
 
       <div className="panel">
@@ -204,7 +203,7 @@ export function MultiViewPage() {
               className="button button-primary"
               onClick={handleApply}
             >
-              Update Preview
+              {t("multiview.updatePreview")}
             </button>
             <button
               type="button"
@@ -213,7 +212,7 @@ export function MultiViewPage() {
               disabled={streams.length === 0}
               style={{ backgroundColor: "#4CAF50" }}
             >
-              Open Multi-view Window
+              {t("multiview.openWindow")}
             </button>
           </div>
           <span className="misc-note">{parsedUrls.length} urls</span>
@@ -221,11 +220,9 @@ export function MultiViewPage() {
       </div>
 
       <div className="panel">
-        <h2 className="section-title-small">Preview</h2>
+        <h2 className="section-title-small">{t("multiview.preview")}</h2>
         {streams.length === 0 ? (
-          <div className="empty-state">
-            Add URLs and click "Update Preview" to see players here.
-          </div>
+          <div className="empty-state">{t("multiview.addUrlsMessage")}</div>
         ) : (
           <div className="preview-grid">
             {streams.map((url) => {

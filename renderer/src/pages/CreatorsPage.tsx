@@ -12,6 +12,7 @@ import {
   useUpdateCreator,
 } from "../hooks/use-creators";
 import { useStageDockReady } from "../hooks/use-stagedock-ready";
+import { useI18n } from "../hooks/use-i18n";
 import { getStageDock } from "../lib/stagedock";
 
 // 配信詳細情報のホバーコンポーネント
@@ -365,6 +366,7 @@ function buildStreamUrl(creator: CreatorWithStatus): string | null {
 }
 
 export function CreatorsPage() {
+  const { t } = useI18n();
   const ready = useStageDockReady();
   const creatorsQuery = useCreators();
   const createMutation = useCreateCreator();
@@ -884,18 +886,15 @@ export function CreatorsPage() {
   return (
     <div className="section creators-page" role="region">
       <div className="section-heading">
-        <h1 className="section-title">Creators</h1>
-        <p className="section-description">
-          Register Twitch or YouTube channels, manage notifications, and keep
-          live creators at the top of your list.
-        </p>
+        <h1 className="section-title">{t("creators.title")}</h1>
+        <p className="section-description">{t("creators.description")}</p>
       </div>
 
       <form className="panel" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div>
             <label className="label" htmlFor="channel">
-              Channel URL or ID
+              {t("creators.channelId")}
             </label>
             <input
               id="channel"
@@ -909,7 +908,7 @@ export function CreatorsPage() {
 
           <div>
             <label className="label" htmlFor="displayName">
-              Display name (optional)
+              {t("creators.displayName")} (optional)
             </label>
             <input
               id="displayName"
@@ -922,7 +921,7 @@ export function CreatorsPage() {
 
           <div>
             <label className="label" htmlFor="tags">
-              Tags (optional)
+              {t("creators.tags")} (optional)
             </label>
             <input
               id="tags"
@@ -932,7 +931,7 @@ export function CreatorsPage() {
               className="input"
             />
             <p className="misc-note" style={{ marginTop: 6 }}>
-              Separate multiple tags with commas or line breaks.
+              {t("creators.tagsDescription")}
             </p>
           </div>
         </div>
@@ -942,7 +941,7 @@ export function CreatorsPage() {
             className="label"
             style={{ gap: 10, textTransform: "none", letterSpacing: 0 }}
           >
-            <span>Send start notifications</span>
+            <span>{t("creators.notifications")}</span>
             <input
               type="checkbox"
               checked={formState.notifyEnabled}
@@ -961,7 +960,7 @@ export function CreatorsPage() {
             className="button button-primary"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Saving..." : "Add creator"}
+            {isSubmitting ? t("creators.adding") : t("creators.addCreator")}
           </button>
         </div>
 
@@ -990,16 +989,24 @@ export function CreatorsPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h2 className="section-title-small">Creators</h2>
+            <h2 className="section-title-small">
+              {t("creators.registeredCreators")}
+            </h2>
             <span className="misc-note">
               {creatorsQuery.isLoading
-                ? "Loading..."
-                : `${filteredCreators.length} creators`}
+                ? t("common.loading")
+                : t("creators.creatorsCount", {
+                    count: filteredCreators.length,
+                  })}
               {activeTagFilters.length > 0 && (
                 <span
                   style={{ marginLeft: "8px", color: "var(--accent, #007acc)" }}
                 >
-                  (filtered by: {activeTagFilters.join(", ")})
+                  (
+                  {t("creators.filteredBy", {
+                    tags: activeTagFilters.join(", "),
+                  })}
+                  )
                 </span>
               )}
             </span>
@@ -1012,9 +1019,10 @@ export function CreatorsPage() {
             style={{ whiteSpace: "nowrap" }}
           >
             {selectedOnlineCreators.length > 0
-              ? `Open Selected (${selectedOnlineCreators.length})`
-              : "Open Selected"}{" "}
-            in Multi-view
+              ? `${t("creators.openSelected")} (${
+                  selectedOnlineCreators.length
+                })`
+              : t("creators.openSelected")}
           </button>
         </div>
         {tagFilterOptions.length > 0 && (
@@ -1032,7 +1040,7 @@ export function CreatorsPage() {
               className="label"
               style={{ marginBottom: 0, whiteSpace: "nowrap" }}
             >
-              Filter by tag:
+              {t("creators.filterByTag")}
             </label>
             <div style={{ position: "relative" }}>
               <button
@@ -1049,8 +1057,8 @@ export function CreatorsPage() {
               >
                 <span>
                   {activeTagFilters.length === 0
-                    ? "Select tags..."
-                    : `${activeTagFilters.length} tag(s) selected`}
+                    ? t("creators.selectTags")
+                    : `${activeTagFilters.length} ${t("creators.tagSelected")}`}
                 </span>
                 <span
                   style={{
@@ -1132,7 +1140,7 @@ export function CreatorsPage() {
                 onClick={clearTagFilters}
                 style={{ whiteSpace: "nowrap" }}
               >
-                Clear ({activeTagFilters.length})
+                {t("creators.clear")} ({activeTagFilters.length})
               </button>
             )}
           </div>
@@ -1141,13 +1149,15 @@ export function CreatorsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th style={{ textAlign: "center" }}>Select</th>
-                <th>Display name</th>
-                <th style={{ textAlign: "center" }}>Platform</th>
-                <th>Tags</th>
-                <th>Notification</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style={{ textAlign: "center" }}>{t("creators.select")}</th>
+                <th>{t("creators.displayName")}</th>
+                <th style={{ textAlign: "center" }}>
+                  {t("creators.platform")}
+                </th>
+                <th>{t("creators.tags")}</th>
+                <th>{t("creators.notification")}</th>
+                <th>{t("creators.status")}</th>
+                <th>{t("creators.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1155,8 +1165,8 @@ export function CreatorsPage() {
                 <tr>
                   <td colSpan={7} className="table-empty">
                     {activeTagFilters.length > 0
-                      ? "No creators match the selected tags."
-                      : "No creators yet. Use the form above to add one."}
+                      ? t("creators.noCreatorsMatch")
+                      : t("creators.noCreators")}
                   </td>
                 </tr>
               ) : (
@@ -1271,9 +1281,13 @@ export function CreatorsPage() {
                       </td>
                       <td>
                         {creator.liveStatus?.isLive ? (
-                          <span className="badge badge-live">Live</span>
+                          <span className="badge badge-live">
+                            {t("creators.live")}
+                          </span>
                         ) : (
-                          <span className="badge badge-offline">Offline</span>
+                          <span className="badge badge-offline">
+                            {t("creators.offline")}
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: "left" }}>
@@ -1292,14 +1306,14 @@ export function CreatorsPage() {
                             className="button button-outline"
                             onClick={() => startEditingCreator(creator)}
                           >
-                            Edit
+                            {t("creators.edit")}
                           </button>
                           <button
                             type="button"
                             className="button button-danger"
                             onClick={() => handleDelete(creator)}
                           >
-                            Remove
+                            {t("creators.delete")}
                           </button>
                         </div>
                       </td>
@@ -1323,10 +1337,10 @@ export function CreatorsPage() {
           >
             <div>
               <h2 className="section-title-small">
-                Edit {editingCreator.displayName}
+                {t("creators.editCreator")}: {editingCreator.displayName}
               </h2>
               <span className="misc-note">
-                Platform: {PLATFORM_LABELS[editState.platform]}
+                {t("creators.platform")}: {PLATFORM_LABELS[editState.platform]}
               </span>
             </div>
             <button
@@ -1335,14 +1349,14 @@ export function CreatorsPage() {
               onClick={handleEditCancel}
               disabled={editMutation.isPending}
             >
-              Cancel
+              {t("creators.cancel")}
             </button>
           </div>
 
           <form onSubmit={handleEditSubmit} className="form-grid">
             <div>
               <label className="label" htmlFor="edit-displayName">
-                Display name
+                {t("creators.displayName")}
               </label>
               <input
                 id="edit-displayName"
@@ -1355,7 +1369,7 @@ export function CreatorsPage() {
 
             <div>
               <label className="label" htmlFor="edit-channel">
-                Channel URL or ID
+                {t("creators.channelId")}
               </label>
               <input
                 id="edit-channel"
@@ -1368,7 +1382,7 @@ export function CreatorsPage() {
 
             <div>
               <label className="label" htmlFor="edit-tags">
-                Tags
+                {t("creators.tags")}
               </label>
               <input
                 id="edit-tags"
@@ -1378,7 +1392,7 @@ export function CreatorsPage() {
                 placeholder="team, collab, fps"
               />
               <p className="misc-note" style={{ marginTop: 6 }}>
-                Separate multiple tags with commas or line breaks.
+                {t("creators.tagsDescription")}
               </p>
             </div>
 
@@ -1399,7 +1413,7 @@ export function CreatorsPage() {
                   className="checkbox"
                   style={{ transform: "scale(0.8)" }}
                 />
-                Enable notifications
+                {t("creators.notifications")}
               </label>
 
               <button
@@ -1407,7 +1421,9 @@ export function CreatorsPage() {
                 className="button button-primary"
                 disabled={editMutation.isPending}
               >
-                {editMutation.isPending ? "Saving..." : "Save changes"}
+                {editMutation.isPending
+                  ? t("creators.saving")
+                  : t("creators.saveChanges")}
               </button>
             </div>
 
