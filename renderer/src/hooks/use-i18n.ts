@@ -159,10 +159,13 @@ const translations: Record<Language, Translations> = {
 };
 
 export function useI18n() {
-  const { data: language = "ja" } = useSetting<Language>("ui.language", "ja");
+  const { data: language } = useSetting<Language>("ui.language");
 
   const t = useMemo(() => {
-    const currentTranslations = translations[language] || translations.ja;
+    // DBから言語設定を取得できない場合は日本語をデフォルトとする
+    const currentLanguage = language || "ja";
+    const currentTranslations =
+      translations[currentLanguage] || translations.ja;
 
     // 翻訳関数を作成
     const translate = (
@@ -198,5 +201,5 @@ export function useI18n() {
     return translate;
   }, [language]);
 
-  return { t, language };
+  return { t, language: language || "ja" };
 }
