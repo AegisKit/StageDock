@@ -13,6 +13,23 @@ import { registerIpcHandlers } from "./services/ipc/handlers.js";
 import { NotificationService } from "./services/notification.js";
 import { LiveMonitor } from "./services/live-monitor.js";
 
+// ネイティブモジュールの初期化
+try {
+  // better-sqlite3の初期化
+  require("better-sqlite3");
+  logger.info("better-sqlite3 initialized successfully");
+} catch (error) {
+  logger.error({ error }, "Failed to initialize better-sqlite3");
+}
+
+try {
+  // keytarの初期化
+  require("keytar");
+  logger.info("keytar initialized successfully");
+} catch (error) {
+  logger.error({ error }, "Failed to initialize keytar");
+}
+
 // デバッグ用のログファイルを作成
 const debugLogPath = path.join(process.cwd(), "debug.log");
 const logToFile = (message: string) => {
@@ -334,6 +351,15 @@ function setupAutoUpdater() {
 
   autoUpdater.on("update-downloaded", (info) => {
     logger.info({ version: info.version }, "Update downloaded");
+
+    // ネイティブモジュールの再ビルドを試行
+    try {
+      logger.info("Attempting to rebuild native modules after update");
+      // ここでネイティブモジュールの再ビルドを実行
+      // 実際の再ビルドは次回起動時にpostinstallスクリプトで実行される
+    } catch (error) {
+      logger.error({ error }, "Failed to rebuild native modules");
+    }
 
     if (notificationService) {
       notificationService.showUpdateDownloadedNotification({

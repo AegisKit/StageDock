@@ -15,6 +15,8 @@ files:
   - package.json
 extraMetadata:
   main: dist/main/main/index.js
+rebuild:
+  nativeModules: true
 win:
   target:
     - nsis
