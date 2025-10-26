@@ -313,8 +313,8 @@ async function createWindow() {
   }
 }
 function setupAutoUpdater() {
-  // アップデートチェックの設定
-  autoUpdater.checkForUpdatesAndNotify();
+  // プライベートリポジトリ用のカスタムアップデートチェック
+  checkForUpdatesCustom();
 
   // アップデートが利用可能になったとき
   autoUpdater.on("update-available", (info) => {
@@ -332,7 +332,6 @@ function setupAutoUpdater() {
     }
   });
 
-  // アップデートのダウンロードが完了したとき
   autoUpdater.on("update-downloaded", (info) => {
     logger.info({ version: info.version }, "Update downloaded");
 
@@ -350,7 +349,6 @@ function setupAutoUpdater() {
     }
   });
 
-  // エラーハンドリング
   autoUpdater.on("error", (error) => {
     logger.error({ error }, "Auto updater error");
   });
@@ -366,6 +364,44 @@ function setupAutoUpdater() {
       "Download progress"
     );
   });
+}
+
+// プライベートリポジトリ用のカスタムアップデートチェック
+async function checkForUpdatesCustom() {
+  try {
+    // GitHub APIを使用してリリース情報を取得
+    const response = await fetch(
+      "https://api.github.com/repos/AegisKit/StageDock/releases/latest"
+    );
+    if (!response.ok) {
+      logger.warn({ status: response.status }, "Failed to fetch release info");
+      return;
+    }
+
+    const release = await response.json();
+    const latestVersion = release.tag_name.replace("v", "");
+    const currentVersion = app.getVersion();
+
+    logger.info({ currentVersion, latestVersion }, "Version comparison");
+
+    if (latestVersion !== currentVersion) {
+      logger.info("Update available via custom check");
+      // アップデート通知を表示
+      if (notificationService) {
+        notificationService.showUpdateNotification({
+          version: latestVersion,
+          releaseNotes: release.body,
+          onDownload: () => {
+            logger.info("User requested update download");
+            // リリースページを開く
+            shell.openExternal(release.html_url);
+          },
+        });
+      }
+    }
+  } catch (error) {
+    logger.error({ error }, "Custom update check failed");
+  }
 }
 
 function registerCoreIpcHandlers() {

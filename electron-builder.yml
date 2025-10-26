@@ -3,7 +3,8 @@ productName: StageDock
 publish:
   provider: github
   owner: AegisKit
-  repo: stagedock
+  repo: StageDock
+  token: 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
 directories:
   output: dist/electron
   buildResources: build
