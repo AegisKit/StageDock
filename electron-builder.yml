@@ -4,7 +4,7 @@ publish:
   provider: github
   owner: AegisKit
   repo: StageDock
-  token: ${GH_TOKEN}
+  token: $GH_TOKEN
   releaseType: release
 directories:
   output: dist/electron
