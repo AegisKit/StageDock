@@ -24,6 +24,7 @@ export function SettingsPage() {
   });
   const [localAutoUpdate, setLocalAutoUpdate] = useState(true);
   const [localLanguage, setLocalLanguage] = useState<Language>("ja");
+  const [isSavingLanguage, setIsSavingLanguage] = useState(false);
 
   useEffect(() => {
     if (silentHours) {
@@ -58,9 +59,21 @@ export function SettingsPage() {
     void setSetting.mutateAsync({ key: "updates.auto", value: checked });
   };
 
-  const handleLanguageChange = (newLanguage: Language) => {
+  const handleLanguageChange = async (newLanguage: Language) => {
+    if (isSavingLanguage) return; // 保存中は無視
+
+    setIsSavingLanguage(true);
     setLocalLanguage(newLanguage);
-    void setSetting.mutateAsync({ key: "ui.language", value: newLanguage });
+    try {
+      await setSetting.mutateAsync({ key: "ui.language", value: newLanguage });
+      console.log(`Language setting saved to DB: ${newLanguage}`);
+    } catch (error) {
+      console.error("Failed to save language setting:", error);
+      // エラーが発生した場合は元の言語に戻す
+      setLocalLanguage(language || "ja");
+    } finally {
+      setIsSavingLanguage(false);
+    }
   };
 
   return (
@@ -146,15 +159,18 @@ export function SettingsPage() {
               }`}
               onClick={() => handleLanguageChange("ja")}
               aria-pressed={localLanguage === "ja"}
+              disabled={isSavingLanguage}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 padding: "8px 14px",
+                opacity: isSavingLanguage ? 0.6 : 1,
               }}
             >
               <span>🇯🇵</span>
               <span>{t("settings.japanese")}</span>
+              {isSavingLanguage && localLanguage === "ja" && <span>...</span>}
             </button>
             <button
               type="button"
@@ -163,15 +179,18 @@ export function SettingsPage() {
               }`}
               onClick={() => handleLanguageChange("en")}
               aria-pressed={localLanguage === "en"}
+              disabled={isSavingLanguage}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 padding: "8px 14px",
+                opacity: isSavingLanguage ? 0.6 : 1,
               }}
             >
               <span>🇺🇸</span>
               <span>{t("settings.english")}</span>
+              {isSavingLanguage && localLanguage === "en" && <span>...</span>}
             </button>
           </div>
         </div>
