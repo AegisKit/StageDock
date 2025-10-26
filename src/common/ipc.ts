@@ -16,6 +16,10 @@ export const IPC_CHANNELS = {
   SETTINGS_SET: "settings:set",
   MULTIVIEW_OPEN: "multiview:open",
   MULTIVIEW_CLOSE: "multiview:close",
+  APP_VERSION: "app:version",
+  UPDATE_CHECK: "update:check",
+  UPDATE_DOWNLOAD: "update:download",
+  UPDATE_INSTALL: "update:install",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

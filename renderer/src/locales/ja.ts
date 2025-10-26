@@ -117,6 +117,11 @@ export default {
     languageDescription: "ユーザーインターフェースの言語を選択してください。",
     japanese: "日本語",
     english: "English",
+    appInfo: "アプリ情報",
+    version: "バージョン",
+    loading: "読み込み中...",
+    checkUpdate: "アップデートをチェック",
+    checkingUpdate: "チェック中...",
   },
   favorites: {
     title: "お気に入り",

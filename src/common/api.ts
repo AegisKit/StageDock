@@ -39,4 +39,12 @@ export interface StageDockAPI {
     open: (urls: string[], layout: string) => Promise<void>;
     close: () => Promise<void>;
   };
+  app: {
+    getVersion: () => Promise<string>;
+  };
+  update: {
+    check: () => Promise<any>;
+    download: () => Promise<{ success: boolean }>;
+    install: () => Promise<{ success: boolean }>;
+  };
 }
