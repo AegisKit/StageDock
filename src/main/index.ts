@@ -420,7 +420,19 @@ function registerCoreIpcHandlers() {
     }
     try {
       const result = await autoUpdater.checkForUpdates();
-      return result;
+      // シリアライズ可能なオブジェクトのみを返す
+      return {
+        updateInfo: result?.updateInfo
+          ? {
+              version: result.updateInfo.version,
+              releaseDate: result.updateInfo.releaseDate,
+              releaseName: result.updateInfo.releaseName,
+              releaseNotes: result.updateInfo.releaseNotes,
+            }
+          : null,
+        downloadPromise: result?.downloadPromise ? true : false,
+        cancellationToken: result?.cancellationToken ? true : false,
+      };
     } catch (error) {
       logger.error({ error }, "Manual update check failed");
       throw error;
