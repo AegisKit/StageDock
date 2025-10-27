@@ -28,6 +28,13 @@ export function SettingsPage() {
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [appVersion, setAppVersion] = useState<string>("");
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<{
+    percent: number;
+    transferred: number;
+    total: number;
+  } | null>(null);
+  const [updateMessage, setUpdateMessage] = useState<string>("");
 
   useEffect(() => {
     if (silentHours) {
@@ -60,6 +67,37 @@ export function SettingsPage() {
       }
     };
     fetchVersion();
+  }, []);
+
+  // アップデートイベントリスナーを設定
+  useEffect(() => {
+    if (!isStageDockAvailable()) return;
+
+    const handleUpdateProgress = (progress: {
+      percent: number;
+      transferred: number;
+      total: number;
+    }) => {
+      setUpdateProgress(progress);
+    };
+
+    const handleUpdateStatus = (status: {
+      isUpdating: boolean;
+      message: string;
+    }) => {
+      setIsUpdating(status.isUpdating);
+      setUpdateMessage(status.message);
+      if (!status.isUpdating) {
+        setUpdateProgress(null);
+      }
+    };
+
+    getStageDock().update.onProgress(handleUpdateProgress);
+    getStageDock().update.onStatus(handleUpdateStatus);
+
+    return () => {
+      // クリーンアップは不要（イベントリスナーは自動で削除される）
+    };
   }, []);
 
   const handleSilentHoursChange =
@@ -177,6 +215,58 @@ export function SettingsPage() {
           </label>
         </div>
       </div>
+
+      {/* アップデート進捗表示 */}
+      {isUpdating && (
+        <div
+          className="panel"
+          style={{ backgroundColor: "#f0f9ff", border: "1px solid #0ea5e9" }}
+        >
+          <h2 className="section-title-small" style={{ color: "#0369a1" }}>
+            {t("settings.updating")}
+          </h2>
+          <p className="misc-note" style={{ color: "#0369a1" }}>
+            {updateMessage}
+          </p>
+          {updateProgress && (
+            <div style={{ marginTop: 16 }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: 8,
+                  backgroundColor: "#e0f2fe",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${updateProgress.percent}%`,
+                    height: "100%",
+                    backgroundColor: "#0ea5e9",
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 8,
+                  fontSize: "0.875rem",
+                  color: "#0369a1",
+                }}
+              >
+                <span>{Math.round(updateProgress.percent)}%</span>
+                <span>
+                  {(updateProgress.transferred / 1024 / 1024).toFixed(1)}MB /
+                  {(updateProgress.total / 1024 / 1024).toFixed(1)}MB
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="panel">
         <h2 className="section-title-small">{t("settings.language")}</h2>

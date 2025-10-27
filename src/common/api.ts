@@ -46,5 +46,15 @@ export interface StageDockAPI {
     check: () => Promise<any>;
     download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
+    onProgress: (
+      callback: (progress: {
+        percent: number;
+        transferred: number;
+        total: number;
+      }) => void
+    ) => void;
+    onStatus: (
+      callback: (status: { isUpdating: boolean; message: string }) => void
+    ) => void;
   };
 }

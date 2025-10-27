@@ -122,6 +122,7 @@ export default {
     loading: "読み込み中...",
     checkUpdate: "アップデートをチェック",
     checkingUpdate: "チェック中...",
+    updating: "アップデート中",
   },
   favorites: {
     title: "お気に入り",

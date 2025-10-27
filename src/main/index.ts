@@ -47,6 +47,25 @@ let database: StageDockDatabase | null = null;
 let liveMonitor: LiveMonitor | null = null;
 let notificationService: NotificationService | null = null;
 let multiviewWindow: BrowserWindow | null = null;
+let mainWindow: BrowserWindow | null = null;
+
+// アップデート進捗をレンダラープロセスに送信
+function sendUpdateProgress(progress: {
+  percent: number;
+  transferred: number;
+  total: number;
+}) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_PROGRESS, progress);
+  }
+}
+
+// アップデートステータスをレンダラープロセスに送信
+function sendUpdateStatus(status: { isUpdating: boolean; message: string }) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC_CHANNELS.UPDATE_STATUS, status);
+  }
+}
 
 function loadEnvFromFile(): void {
   const requiredKeys = [
@@ -98,7 +117,6 @@ loadEnvFromFile();
 
 const isDevelopment = !app.isPackaged;
 // CommonJSでは__filenameと__dirnameは自動的に利用可能
-let mainWindow: BrowserWindow | null = null;
 function resolvePreloadPath() {
   return path.join(__dirname, "../../preload/preload/index.cjs");
 }
@@ -343,6 +361,10 @@ function setupAutoUpdater() {
         releaseNotes: info.releaseNotes ? String(info.releaseNotes) : undefined,
         onDownload: () => {
           logger.info("User requested update download");
+          sendUpdateStatus({
+            isUpdating: true,
+            message: "アップデートをダウンロード中...",
+          });
           autoUpdater.downloadUpdate();
         },
       });
@@ -361,18 +383,16 @@ function setupAutoUpdater() {
       logger.error({ error }, "Failed to rebuild native modules");
     }
 
-    if (notificationService) {
-      notificationService.showUpdateDownloadedNotification({
-        version: info.version,
-        onInstall: () => {
-          logger.info("User requested update installation");
-          autoUpdater.quitAndInstall();
-        },
-        onRestartLater: () => {
-          logger.info("User chose to restart later");
-        },
-      });
-    }
+    sendUpdateStatus({
+      isUpdating: true,
+      message: "アップデートの準備が完了しました。再起動します...",
+    });
+
+    // 3秒後に自動で再起動
+    setTimeout(() => {
+      logger.info("Auto-restarting after update");
+      autoUpdater.quitAndInstall();
+    }, 3000);
   });
 
   autoUpdater.on("error", (error) => {
@@ -389,6 +409,13 @@ function setupAutoUpdater() {
       },
       "Download progress"
     );
+
+    // 進捗をレンダラープロセスに送信
+    sendUpdateProgress({
+      percent: progressObj.percent,
+      transferred: progressObj.transferred,
+      total: progressObj.total,
+    });
   });
 }
 
