@@ -9,30 +9,7 @@ import type {
   UpdateCreatorPayload,
   UrlSet,
 } from "../common/types.js";
-
-const IPC_CHANNELS = {
-  OPEN_EXTERNAL: "app:open-external",
-  QUIT: "app:quit",
-  CREATORS_LIST: "creators:list",
-  CREATORS_CREATE: "creators:create",
-  CREATORS_UPDATE: "creators:update",
-  CREATORS_DELETE: "creators:delete",
-  CREATORS_REFRESH_STATUS: "creators:refresh-status",
-  LIVE_STATUS_LIST: "live-status:list",
-  LIVE_STATUS_UPSERT: "live-status:upsert",
-  URL_SETS_LIST: "url-sets:list",
-  URL_SETS_SAVE: "url-sets:save",
-  URL_SETS_DELETE: "url-sets:delete",
-  URL_SETS_TOUCH: "url-sets:touch",
-  SETTINGS_GET: "settings:get",
-  SETTINGS_SET: "settings:set",
-  MULTIVIEW_OPEN: "multiview:open",
-  MULTIVIEW_CLOSE: "multiview:close",
-  APP_VERSION: "app:version",
-  UPDATE_CHECK: "update:check",
-  UPDATE_DOWNLOAD: "update:download",
-  UPDATE_INSTALL: "update:install",
-} as const;
+import { IPC_CHANNELS } from "../common/ipc.js";
 
 export type StageDockAPI = {
   openExternal: (url: string) => Promise<void>;
@@ -71,6 +48,16 @@ export type StageDockAPI = {
     check: () => Promise<any>;
     download: () => Promise<{ success: boolean }>;
     install: () => Promise<{ success: boolean }>;
+    onProgress: (
+      callback: (progress: {
+        percent: number;
+        transferred: number;
+        total: number;
+      }) => void
+    ) => void;
+    onStatus: (
+      callback: (status: { isUpdating: boolean; message: string }) => void
+    ) => void;
   };
 };
 
@@ -176,6 +163,24 @@ const api: StageDockAPI = {
     },
     install: async () => {
       return await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL);
+    },
+    onProgress: (
+      callback: (progress: {
+        percent: number;
+        transferred: number;
+        total: number;
+      }) => void
+    ) => {
+      ipcRenderer.on(IPC_CHANNELS.UPDATE_PROGRESS, (_event, progress) => {
+        callback(progress);
+      });
+    },
+    onStatus: (
+      callback: (status: { isUpdating: boolean; message: string }) => void
+    ) => {
+      ipcRenderer.on(IPC_CHANNELS.UPDATE_STATUS, (_event, status) => {
+        callback(status);
+      });
     },
   },
 };

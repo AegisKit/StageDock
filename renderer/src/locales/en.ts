@@ -123,6 +123,7 @@ export default {
     loading: "Loading...",
     checkUpdate: "Check for Updates",
     checkingUpdate: "Checking...",
+    updating: "Updating",
   },
   favorites: {
     title: "Favorites",
