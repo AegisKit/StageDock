@@ -195,27 +195,6 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel">
-        <h2 className="section-title-small">{t("settings.autoUpdates")}</h2>
-        <div className="form-actions">
-          <p className="section-description" style={{ margin: 0 }}>
-            {t("settings.autoUpdatesDescription")}
-          </p>
-          <label
-            className="label"
-            style={{ gap: 12, textTransform: "none", letterSpacing: 0 }}
-          >
-            <span>{t("settings.autoUpdate")}</span>
-            <input
-              type="checkbox"
-              checked={localAutoUpdate}
-              onChange={(event) => handleAutoUpdateToggle(event.target.checked)}
-              className="checkbox"
-            />
-          </label>
-        </div>
-      </div>
-
       {/* アップデート進捗表示 */}
       {isUpdating && (
         <div
