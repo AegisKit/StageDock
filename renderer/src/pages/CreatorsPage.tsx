@@ -377,6 +377,9 @@ export function CreatorsPage() {
   const [formState, setFormState] = useState<FormState>(DEFAULT_FORM_STATE);
   const [inputError, setInputError] = useState<string | null>(null);
   const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<"all" | "live" | "offline">(
+    "all"
+  );
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [editingCreator, setEditingCreator] =
     useState<CreatorWithStatus | null>(null);
@@ -483,22 +486,33 @@ export function CreatorsPage() {
   const pageSize = 20;
 
   const filteredCreators = useMemo(() => {
-    if (activeTagFilters.length === 0) {
-      return sortedCreators;
+    let filtered = sortedCreators;
+
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((creator) => {
+        const isLive = creator.liveStatus?.isLive ?? false;
+        return statusFilter === "live" ? isLive : !isLive;
+      });
     }
 
-    return sortedCreators.filter((creator) => {
-      const creatorTags = getCreatorTags(creator);
+    // Tag filter
+    if (activeTagFilters.length > 0) {
+      filtered = filtered.filter((creator) => {
+        const creatorTags = getCreatorTags(creator);
 
-      // すべての選択されたタグがクリエイターに含まれているかチェック（AND条件）
-      return activeTagFilters.every((filter) => {
-        if (filter === UNTAGGED_TAG_VALUE) {
-          return creatorTags.length === 0;
-        }
-        return creatorTags.includes(filter);
+        // すべての選択されたタグがクリエイターに含まれているかチェック（AND条件）
+        return activeTagFilters.every((filter) => {
+          if (filter === UNTAGGED_TAG_VALUE) {
+            return creatorTags.length === 0;
+          }
+          return creatorTags.includes(filter);
+        });
       });
-    });
-  }, [sortedCreators, activeTagFilters]);
+    }
+
+    return filtered;
+  }, [sortedCreators, activeTagFilters, statusFilter]);
 
   useEffect(() => {
     const total = Math.max(
@@ -1216,6 +1230,55 @@ export function CreatorsPage() {
             )}
           </div>
         )}
+
+        {/* Status Filter */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <label
+            className="label"
+            style={{ marginBottom: 0, whiteSpace: "nowrap" }}
+          >
+            {t("creators.statusFilter")}
+          </label>
+          <div
+            style={{
+              display: "inline-flex",
+              border: "1px solid var(--border-color)",
+              borderRadius: 10,
+              overflow: "hidden",
+            }}
+          >
+            {(
+              [
+                { key: "all", label: t("creators.allStatus") },
+                { key: "live", label: t("creators.liveOnly") },
+                { key: "offline", label: t("creators.offlineOnly") },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                className={`button ${
+                  statusFilter === opt.key ? "button-primary" : "button-ghost"
+                }`}
+                onClick={() => setStatusFilter(opt.key)}
+                style={{
+                  borderRadius: 0,
+                  border: "none",
+                  boxShadow: "none",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
