@@ -632,6 +632,13 @@ async function initializeApp() {
 
     logToFile("Waiting for app to be ready...");
     await app.whenReady();
+    // Ensure Windows notifications use our app identity instead of Electron
+    try {
+      app.setAppUserModelId("StageDock");
+      logToFile("AppUserModelID set to com.stagedock.app");
+    } catch (error) {
+      logger.warn({ error }, "Failed to set AppUserModelID");
+    }
     logToFile("App is ready, initializing database...");
     console.log("App is ready, initializing database...");
     database = await StageDockDatabase.create();
