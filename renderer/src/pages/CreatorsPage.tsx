@@ -538,12 +538,35 @@ export function CreatorsPage() {
 
   // 選択されたタグに基づいて利用可能なタグをフィルタリング
   const availableTagOptions = useMemo(() => {
+    // まず配信状態でベース集合を絞り込む
+    const baseByStatus = sortedCreators.filter((creator) => {
+      if (statusFilter === "all") return true;
+      const isLive = creator.liveStatus?.isLive ?? false;
+      return statusFilter === "live" ? isLive : !isLive;
+    });
+
     if (activeTagFilters.length === 0) {
-      return tagFilterOptions;
+      // 状態で絞った集合に対して各タグの件数を計算
+      const tagToCount = new Map<string, number>();
+      baseByStatus.forEach((creator) => {
+        const tags = getCreatorTags(creator);
+        if (tags.length === 0) {
+          tagToCount.set(
+            UNTAGGED_TAG_VALUE,
+            (tagToCount.get(UNTAGGED_TAG_VALUE) ?? 0) + 1
+          );
+        } else {
+          tags.forEach((t) => tagToCount.set(t, (tagToCount.get(t) ?? 0) + 1));
+        }
+      });
+      return tagFilterOptions.map((opt) => ({
+        ...opt,
+        count: tagToCount.get(opt.value) ?? 0,
+      }));
     }
 
-    // 選択されたタグを持つクリエイターを取得
-    const creatorsWithSelectedTags = sortedCreators.filter((creator) => {
+    // 選択されたタグを持つクリエイターを取得（状態フィルタ考慮）
+    const creatorsWithSelectedTags = baseByStatus.filter((creator) => {
       const creatorTags = getCreatorTags(creator);
       return activeTagFilters.every((filter) => {
         if (filter === UNTAGGED_TAG_VALUE) {
@@ -556,24 +579,16 @@ export function CreatorsPage() {
     // これらのクリエイターが持つタグのみを表示
     const availableTags = new Set<string>();
     creatorsWithSelectedTags.forEach((creator) => {
-      getCreatorTags(creator).forEach((tag) => availableTags.add(tag));
+      const tags = getCreatorTags(creator);
+      if (tags.length === 0) availableTags.add(UNTAGGED_TAG_VALUE);
+      tags.forEach((tag) => availableTags.add(tag));
     });
 
-    // Untaggedオプションも含める
-    if (
-      creatorsWithSelectedTags.some(
-        (creator) => getCreatorTags(creator).length === 0
-      )
-    ) {
-      availableTags.add(UNTAGGED_TAG_VALUE);
-    }
-
-    // 各タグについて、現在の条件 + そのタグを持つクリエイター数を計算
+    // 各タグについて、現在の条件 + そのタグを持つクリエイター数を計算（状態フィルタ考慮）
     return tagFilterOptions
       .filter((option) => availableTags.has(option.value))
       .map((option) => {
-        // 現在の条件 + そのタグを持つクリエイターをカウント
-        const count = sortedCreators.filter((creator) => {
+        const count = baseByStatus.filter((creator) => {
           const creatorTags = getCreatorTags(creator);
 
           // 現在選択されているタグの条件を満たすかチェック
@@ -584,9 +599,7 @@ export function CreatorsPage() {
             return creatorTags.includes(filter);
           });
 
-          if (!meetsCurrentConditions) {
-            return false;
-          }
+          if (!meetsCurrentConditions) return false;
 
           // そのタグも持っているかチェック
           if (option.value === UNTAGGED_TAG_VALUE) {
@@ -600,7 +613,7 @@ export function CreatorsPage() {
           count,
         };
       });
-  }, [tagFilterOptions, activeTagFilters, sortedCreators]);
+  }, [tagFilterOptions, activeTagFilters, sortedCreators, statusFilter]);
 
   const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>([]);
   const selectedOnlineCreators = useMemo(
