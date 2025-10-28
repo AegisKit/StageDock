@@ -72,6 +72,7 @@ export default {
     live: "ライブ",
     offline: "オフライン",
     refresh: "更新",
+    refreshing: "更新中...",
     edit: "編集",
     delete: "削除",
     confirmDelete: "このクリエイターを削除してもよろしいですか？",
