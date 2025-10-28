@@ -3,15 +3,22 @@
 }
 
 :root {
-  --bg-primary: #0b1020;
-  --bg-panel: rgba(18, 24, 43, 0.9);
-  --bg-surface: rgba(26, 34, 56, 0.85);
-  --border-color: rgba(64, 72, 103, 0.45);
+  /* Theme */
+  --bg-primary: radial-gradient(
+    1200px 800px at 20% -10%,
+    #0e1a50 0%,
+    #0b1020 60%,
+    #070b18 100%
+  );
+  --bg-panel: rgba(18, 24, 43, 0.6);
+  --bg-surface: rgba(26, 34, 56, 0.55);
+  --border-color: rgba(88, 101, 242, 0.28);
   --accent: #5865f2;
   --accent-soft: rgba(88, 101, 242, 0.2);
   --danger: #ff8ea3;
   --text-primary: #e7ebff;
   --text-muted: #9aa6d4;
+  --glass-blur: saturate(1.2) blur(10px);
   color-scheme: dark;
   font-family: "Segoe UI", "Roboto", system-ui, -apple-system,
     BlinkMacSystemFont, sans-serif;
@@ -137,13 +144,15 @@ a {
 
 .panel {
   background: var(--bg-panel);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  box-shadow: 0 18px 40px rgba(8, 14, 36, 0.35);
+  box-shadow: 0 18px 50px rgba(8, 14, 36, 0.45);
 }
 
 .panel-muted {
@@ -172,12 +181,24 @@ a {
 .select,
 .textarea {
   width: 100%;
-  border-radius: 9px;
-  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  border: 1px solid rgba(88, 101, 242, 0.25);
   padding: 10px 12px;
-  background: var(--bg-surface);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0)
+  );
   color: var(--text-primary);
   font-size: 14px;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: rgba(88, 101, 242, 0.6);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.25);
 }
 
 .textarea {
@@ -199,19 +220,29 @@ a {
   gap: 12px;
 }
 
+/* Button base */
 .button {
-  border: none;
-  border-radius: 9px;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 10px;
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, border 0.2s ease, color 0.2s ease,
-    transform 0.1s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0)
+  );
+  color: var(--text-primary);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+    transform 0.1s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 8px 20px rgba(8, 14, 36, 0.25);
 }
 
 .button:disabled {
@@ -219,42 +250,92 @@ a {
   cursor: not-allowed;
 }
 
-.button-primary {
-  background: var(--accent);
-  color: #fff;
-}
-
-.button-primary:hover:not(:disabled) {
-  background: #6d74ff;
+/* Generic hover/ focus */
+.button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.5),
+    0 0 0 4px rgba(88, 101, 242, 0.25);
+}
 
+/* Primary */
+.button-primary {
+  background: linear-gradient(180deg, #6f78ff, #5865f2);
+  border-color: rgba(88, 101, 242, 0.55);
+  color: #fff;
+}
+.button-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #7b83ff, #6571ff);
+}
+
+/* Outline */
 .button-outline {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
 }
-
 .button-outline:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: rgba(88, 101, 242, 0.6);
+  background: rgba(88, 101, 242, 0.12);
+}
+
+/* Danger */
+.button-danger {
+  background: linear-gradient(
+    180deg,
+    rgba(225, 100, 120, 0.28),
+    rgba(225, 100, 120, 0.2)
+  );
+  color: var(--danger);
+  border: 1px solid rgba(225, 100, 120, 0.42);
+}
+.button-danger:hover:not(:disabled) {
+  background: rgba(225, 100, 120, 0.34);
+}
+
+/* Ghost / subtle */
+.button-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.button-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
   color: #fff;
 }
 
-.button-danger {
-  background: rgba(225, 100, 120, 0.18);
-  color: var(--danger);
-  border: 1px solid rgba(225, 100, 120, 0.32);
+/* Icon-only */
+.button-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.button-danger:hover:not(:disabled) {
-  background: rgba(225, 100, 120, 0.28);
+/* Sizes */
+.button-sm {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.button-lg {
+  padding: 12px 18px;
+  font-size: 15px;
+  border-radius: 12px;
 }
 
 .table-wrapper {
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
-  background: rgba(12, 18, 32, 0.3);
+  border-radius: 16px;
+  border: 1px solid rgba(88, 101, 242, 0.25);
+  background: rgba(12, 18, 32, 0.35);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .table {
@@ -264,7 +345,11 @@ a {
 }
 
 .table thead {
-  background: rgba(15, 20, 36, 0.9);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 20, 36, 0.85),
+    rgba(15, 20, 36, 0.65)
+  );
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 12px;
@@ -299,16 +384,19 @@ a {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .badge-live {
   background: rgba(45, 214, 149, 0.16);
   color: #86ffd4;
+  box-shadow: 0 0 0 1px rgba(45, 214, 149, 0.25) inset;
 }
 
 .badge-offline {
   background: rgba(80, 96, 142, 0.16);
   color: #aeb9e0;
+  box-shadow: 0 0 0 1px rgba(80, 96, 142, 0.25) inset;
 }
 
 .card-grid {
@@ -533,7 +621,7 @@ a {
   border-top: 1px solid var(--border);
 }
 
-/* マルチビューコンチE�� */
+/* マルチビューコンチE�� */
 .multiview-container {
   display: flex;
   flex-direction: column;
@@ -599,7 +687,7 @@ a {
   min-height: 100vh;
 }
 
-/* ストリームグリチE�� */
+/* ストリームグリチE�� */
 .stream-grid {
   display: grid;
   gap: 8px;
@@ -608,7 +696,7 @@ a {
   min-height: 400px;
 }
 
-/* ストリームアイチE�� */
+/* ストリームアイチE�� */
 .stream-item {
   position: relative;
   background: var(--surface);
@@ -756,6 +844,4 @@ a {
     height: 100px;
   }
 }
-@import './favorites.css';
-
-
+@import "./favorites.css";
