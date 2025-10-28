@@ -110,10 +110,11 @@ export default {
   settings: {
     title: "設定",
     description: "通知ウィンドウ、自動更新、統合プレースホルダーを管理します。",
-    quietHours: "ミュート時間",
-    quietHoursDescription: "選択した時間帯に開始通知を抑制します（24時間形式）",
-    from: "開始",
-    to: "終了",
+    notifications: "通知",
+    notificationsDescription: "アプリ全体の通知を管理します。",
+    disableAllNotifications: "すべての通知をオフにする",
+    notificationsOn: "通知オン",
+    notificationsOff: "通知オフ",
     autoUpdates: "自動更新",
     autoUpdatesDescription:
       "StageDockのリリースを自動的にチェックし、バックグラウンドでインストールします。",
