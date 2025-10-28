@@ -40,13 +40,19 @@ export class LiveMonitor {
 
   private async tick(isInitial = false) {
     const creators = this.database.listCreators();
+    const notificationsEnabled = this.database.getSetting<boolean>(
+      "notifications.enabled"
+    );
+    // すべての通知オフ設定を反映
+    this.suppressNotifications = isInitial || notificationsEnabled === false;
     logger.debug({ count: creators.length }, "Live monitor tick");
     try {
       await Promise.allSettled(
         creators.map((creator) => this.syncCreator(creator))
       );
     } finally {
-      if (isInitial) {
+      // 初回同期後の解除は、グローバル設定がオンのときのみ
+      if (isInitial && notificationsEnabled !== false) {
         this.suppressNotifications = false;
       }
     }

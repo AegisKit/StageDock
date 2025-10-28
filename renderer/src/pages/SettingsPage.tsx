@@ -5,24 +5,18 @@ import { getStageDock, isStageDockAvailable } from "../lib/stagedock";
 
 type Language = "ja" | "en";
 
-interface SilentHours {
-  start: string;
-  end: string;
-}
-
 export function SettingsPage() {
   const { t } = useI18n();
-  const { data: silentHours } = useSetting<SilentHours>(
-    "notifications.silentHours"
+  const { data: notificationsEnabled } = useSetting<boolean>(
+    "notifications.enabled",
+    true
   );
   const { data: autoUpdateEnabled } = useSetting<boolean>("updates.auto", true);
   const { data: language } = useSetting<Language>("ui.language", "ja");
   const setSetting = useSetSetting();
 
-  const [localSilentHours, setLocalSilentHours] = useState<SilentHours>({
-    start: "00:00",
-    end: "08:00",
-  });
+  const [localNotificationsEnabled, setLocalNotificationsEnabled] =
+    useState(true);
   const [localAutoUpdate, setLocalAutoUpdate] = useState(true);
   const [localLanguage, setLocalLanguage] = useState<Language>("ja");
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
@@ -37,10 +31,10 @@ export function SettingsPage() {
   const [updateMessage, setUpdateMessage] = useState<string>("");
 
   useEffect(() => {
-    if (silentHours) {
-      setLocalSilentHours(silentHours);
+    if (typeof notificationsEnabled === "boolean") {
+      setLocalNotificationsEnabled(notificationsEnabled);
     }
-  }, [silentHours]);
+  }, [notificationsEnabled]);
 
   useEffect(() => {
     if (typeof autoUpdateEnabled === "boolean") {
@@ -100,15 +94,13 @@ export function SettingsPage() {
     };
   }, []);
 
-  const handleSilentHoursChange =
-    (field: keyof SilentHours) => (value: string) => {
-      const next = { ...localSilentHours, [field]: value } as SilentHours;
-      setLocalSilentHours(next);
-      void setSetting.mutateAsync({
-        key: "notifications.silentHours",
-        value: next,
-      });
-    };
+  const handleNotificationsToggle = (checked: boolean) => {
+    setLocalNotificationsEnabled(checked);
+    void setSetting.mutateAsync({
+      key: "notifications.enabled",
+      value: checked,
+    });
+  };
 
   const handleAutoUpdateToggle = (checked: boolean) => {
     setLocalAutoUpdate(checked);
@@ -161,37 +153,25 @@ export function SettingsPage() {
       </div>
 
       <div className="panel">
-        <h2 className="section-title-small">{t("settings.quietHours")}</h2>
-        <p className="misc-note">{t("settings.quietHoursDescription")}</p>
-        <div className="form-grid" style={{ maxWidth: 420 }}>
-          <div>
-            <label className="label" htmlFor="quiet-from">
-              {t("settings.from")}
-            </label>
-            <input
-              id="quiet-from"
-              type="time"
-              value={localSilentHours.start}
-              onChange={(event) =>
-                handleSilentHoursChange("start")(event.target.value)
-              }
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="quiet-to">
-              {t("settings.to")}
-            </label>
-            <input
-              id="quiet-to"
-              type="time"
-              value={localSilentHours.end}
-              onChange={(event) =>
-                handleSilentHoursChange("end")(event.target.value)
-              }
-              className="input"
-            />
-          </div>
+        <h2 className="section-title-small">{t("settings.notifications")}</h2>
+        <p className="misc-note">{t("settings.notificationsDescription")}</p>
+        <div className="form-actions">
+          <label className="label" style={{ marginBottom: 0 }}>
+            {t("settings.disableAllNotifications")}
+          </label>
+          <button
+            type="button"
+            className={`button ${
+              localNotificationsEnabled ? "button-outline" : "button-primary"
+            }`}
+            onClick={() =>
+              handleNotificationsToggle(!localNotificationsEnabled)
+            }
+          >
+            {localNotificationsEnabled
+              ? t("settings.notificationsOn")
+              : t("settings.notificationsOff")}
+          </button>
         </div>
       </div>
 

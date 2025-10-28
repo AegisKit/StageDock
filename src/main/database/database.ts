@@ -285,20 +285,13 @@ export class StageDockDatabase {
       this.setSetting("updates.auto", true);
     }
 
-    // デフォルトのミュート時間設定をチェック
-
-    const existingSilentHours = this.getSetting<{ start: string; end: string }>(
-      "notifications.silentHours"
+    // デフォルトの通知有効設定をチェック
+    const existingNotificationsEnabled = this.getSetting<boolean>(
+      "notifications.enabled"
     );
-
-    if (!existingSilentHours) {
-      logger.info("Setting default silent hours");
-
-      this.setSetting("notifications.silentHours", {
-        start: "00:00",
-
-        end: "08:00",
-      });
+    if (typeof existingNotificationsEnabled !== "boolean") {
+      logger.info("Setting default notifications.enabled to true");
+      this.setSetting("notifications.enabled", true);
     }
   }
 
