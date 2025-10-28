@@ -391,6 +391,8 @@ export function CreatorsPage() {
     y: 0,
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const creators = creatorsQuery.data ?? [];
   const sortedCreators = useMemo(() => sortCreators(creators), [creators]);
   const onlineCreators = useMemo(
@@ -819,6 +821,34 @@ export function CreatorsPage() {
     }
   }, [ready, selectedOnlineCreators]);
 
+  const handleRefreshAll = useCallback(async () => {
+    if (!ready || isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      // 全クリエイターのライブステータスを手動更新
+      await Promise.allSettled(
+        creators.map(async (creator) => {
+          try {
+            await getStageDock().creators.refreshStatus(creator.id);
+          } catch (error) {
+            console.error(
+              `Failed to refresh status for ${creator.displayName}:`,
+              error
+            );
+          }
+        })
+      );
+
+      // データを再取得
+      await creatorsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to refresh creators:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [ready, isRefreshing, creators, creatorsQuery]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setInputError(null);
@@ -1011,19 +1041,34 @@ export function CreatorsPage() {
               )}
             </span>
           </div>
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={handleOpenOnlineStreams}
-            disabled={!ready || selectedOnlineCreators.length === 0}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            {selectedOnlineCreators.length > 0
-              ? `${t("creators.openSelected")} (${
-                  selectedOnlineCreators.length
-                })`
-              : t("creators.openSelected")}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={handleRefreshAll}
+              disabled={!ready || isRefreshing || creators.length === 0}
+              style={{
+                whiteSpace: "nowrap",
+                opacity:
+                  !ready || isRefreshing || creators.length === 0 ? 0.6 : 1,
+              }}
+            >
+              {isRefreshing ? t("creators.refreshing") : t("creators.refresh")}
+            </button>
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={handleOpenOnlineStreams}
+              disabled={!ready || selectedOnlineCreators.length === 0}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {selectedOnlineCreators.length > 0
+                ? `${t("creators.openSelected")} (${
+                    selectedOnlineCreators.length
+                  })`
+                : t("creators.openSelected")}
+            </button>
+          </div>
         </div>
         {tagFilterOptions.length > 0 && (
           <div

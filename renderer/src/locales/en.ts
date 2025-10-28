@@ -72,6 +72,7 @@ export default {
     live: "Live",
     offline: "Offline",
     refresh: "Refresh",
+    refreshing: "Refreshing...",
     edit: "Edit",
     delete: "Delete",
     confirmDelete: "Are you sure you want to delete this creator?",
