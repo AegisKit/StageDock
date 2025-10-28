@@ -478,6 +478,10 @@ export function CreatorsPage() {
     }
   }, [activeTagFilters, tagFilterOptions]);
 
+  // Pagination
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
   const filteredCreators = useMemo(() => {
     if (activeTagFilters.length === 0) {
       return sortedCreators;
@@ -495,6 +499,28 @@ export function CreatorsPage() {
       });
     });
   }, [sortedCreators, activeTagFilters]);
+
+  useEffect(() => {
+    const total = Math.max(
+      1,
+      Math.ceil((filteredCreators?.length ?? 0) / pageSize)
+    );
+    setPage((prev) => Math.min(Math.max(1, prev), total));
+  }, [filteredCreators?.length]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((filteredCreators?.length ?? 0) / pageSize)),
+    [filteredCreators?.length]
+  );
+
+  const currentPageCreators = useMemo(
+    () =>
+      (filteredCreators ?? []).slice(
+        (page - 1) * pageSize,
+        (page - 1) * pageSize + pageSize
+      ),
+    [filteredCreators, page]
+  );
 
   // 選択されたタグに基づいて利用可能なタグをフィルタリング
   const availableTagOptions = useMemo(() => {
@@ -1215,7 +1241,7 @@ export function CreatorsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredCreators.map((creator) => {
+                currentPageCreators.map((creator) => {
                   const normalizedTags = getCreatorTags(creator);
                   return (
                     <tr key={creator.id}>
@@ -1369,6 +1395,36 @@ export function CreatorsPage() {
             </tbody>
           </table>
         </div>
+        {filteredCreators.length > pageSize && (
+          <div
+            className="form-actions"
+            style={{ justifyContent: "flex-end", gap: 8, alignItems: "center" }}
+          >
+            <span className="misc-note" style={{ marginRight: 8 }}>
+              {`${(page - 1) * pageSize + 1}-${Math.min(
+                page * pageSize,
+                filteredCreators.length
+              )} / ${filteredCreators.length}`}
+            </span>
+            <button
+              type="button"
+              className="button button-outline button-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              {t("common.back")}
+            </button>
+            <span className="misc-note">{`${page}/${totalPages}`}</span>
+            <button
+              type="button"
+              className="button button-outline button-sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              {t("common.next")}
+            </button>
+          </div>
+        )}
       </div>
       {editingCreator && editState && (
         <div className="panel">
