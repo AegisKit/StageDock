@@ -596,15 +596,21 @@ function setupAutoUpdater() {
 async function checkForUpdatesCustom() {
   try {
     // GitHub APIを使用してリリース情報を取得
-    const githubToken =
-      ;
+    // 環境変数からトークンを取得（パブリックリポジトリの場合は不要）
+    const githubToken = process.env.GH_TOKEN;
+    const headers: HeadersInit = {
+      Accept: "application/vnd.github.v3+json",
+    };
+    
+    // トークンがある場合のみ認証ヘッダーを追加
+    if (githubToken) {
+      headers.Authorization = `token ${githubToken}`;
+    }
+    
     const response = await fetch(
       "https://api.github.com/repos/AegisKit/StageDock/releases/latest",
       {
-        headers: {
-          Authorization: `token ${githubToken}`,
-          Accept: "application/vnd.github.v3+json",
-        },
+        headers,
       }
     );
 
