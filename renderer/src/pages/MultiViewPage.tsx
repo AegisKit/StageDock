@@ -2,6 +2,20 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getStageDock } from "../lib/stagedock";
 import { useI18n } from "../hooks/use-i18n";
 
+const STAGEDOCK_REFERRER = "https://stagedock.app/multiview";
+
+function decorateYouTubeEmbedUrl(embedUrl: string): string {
+  try {
+    const url = new URL(embedUrl);
+    url.hostname = "www.youtube-nocookie.com";
+    url.searchParams.set("origin", STAGEDOCK_REFERRER);
+    url.searchParams.set("widget_referrer", STAGEDOCK_REFERRER);
+    return url.toString();
+  } catch {
+    return embedUrl;
+  }
+}
+
 function normalizeUrls(input: string) {
   return input
     .split(/\r?\n/)
@@ -54,13 +68,7 @@ function toYouTubeEmbed(urlObj: URL) {
   const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0`;
   console.log("✅ 生成された埋め込みURL:", embedUrl);
 
-  return embedUrl;
-}
-
-function withAltDomain(embedUrl: string) {
-  return embedUrl.includes("www.youtube.com")
-    ? embedUrl.replace("www.youtube.com", "www.youtube-nocookie.com")
-    : embedUrl.replace("www.youtube-nocookie.com", "www.youtube.com");
+  return decorateYouTubeEmbedUrl(embedUrl);
 }
 
 function convertToEmbedUrl(url: string): string {
@@ -246,6 +254,8 @@ export function MultiViewPage() {
                     title={url}
                     style={{ width: "100%", height: "200px", border: "none" }}
                     frameBorder="0"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-top-navigation"
                     onLoad={() => {
                       console.log("✅ iframe読み込み完了:", url);
                     }}
