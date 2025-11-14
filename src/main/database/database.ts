@@ -187,79 +187,7 @@ export class StageDockDatabase {
       }
     }
 
-    this.initializeDefaultData();
-
     this.initializeDefaultSettings();
-  }
-
-  private initializeDefaultData(): void {
-    // デフォルトのクリエイターが存在するかチェック
-
-    const existingCreators = this.db
-
-      .prepare<unknown[], any>("SELECT COUNT(*) as count FROM creators")
-
-      .get() as { count: number };
-
-    // 既にデータがある場合は初期化をスキップ
-
-    if (existingCreators.count > 0) {
-      logger.debug("Default creators already exist, skipping initialization");
-
-      return;
-    }
-
-    logger.info("Initializing default creators");
-
-    // デフォルトのお気に入りを3つ登録
-
-    const defaultCreators = [
-      {
-        platform: "twitch" as const,
-
-        channelId: "ninja",
-
-        displayName: "Ninja",
-
-        notifyEnabled: true,
-
-        tags: [],
-      },
-
-      {
-        platform: "twitch" as const,
-
-        channelId: "shroud",
-
-        displayName: "Shroud",
-
-        notifyEnabled: true,
-
-        tags: [],
-      },
-
-      {
-        platform: "youtube" as const,
-
-        channelId: "@MrBeast",
-
-        displayName: "MrBeast",
-
-        notifyEnabled: true,
-
-        tags: [],
-      },
-    ];
-
-    for (const creator of defaultCreators) {
-      try {
-        this.createCreator(creator);
-
-        logger.debug({ creator }, "Created default creator");
-      } catch (error) {
-        logger.warn({ error, creator }, "Failed to create default creator");
-      }
-    }
   }
 
   private initializeDefaultSettings(): void {
