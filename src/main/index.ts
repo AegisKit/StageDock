@@ -1,8 +1,5 @@
 ﻿import { app, BrowserWindow, ipcMain, nativeTheme, shell } from "electron";
-import type {
-  OnBeforeSendHeadersListenerDetails,
-  Session,
-} from "electron";
+import type { OnBeforeSendHeadersListenerDetails, Session } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -518,7 +515,14 @@ async function createWindow() {
 }
 function setupAutoUpdater() {
   // プライベートリポジトリ用のカスタムアップデートチェック
-  checkForUpdatesCustom();
+  // エラーが発生してもアプリがクラッシュしないように、エラーハンドリングを追加
+  checkForUpdatesCustom().catch((error) => {
+    // カスタムアップデートチェックのエラーは非致命的
+    logger.debug(
+      { error },
+      "Custom update check initialization failed (non-fatal)"
+    );
+  });
 
   // アップデートが利用可能になったとき
   autoUpdater.on("update-available", (info) => {
@@ -609,11 +613,25 @@ async function checkForUpdatesCustom() {
         logger.warn(
           "GitHub API authentication failed, falling back to standard updater"
         );
-        // 認証エラーの場合は標準のelectron-updaterを使用
-        autoUpdater.checkForUpdates();
+        // 認証エラーの場合は標準のelectron-updaterを使用（エラーは無視）
+        autoUpdater.checkForUpdates().catch((error) => {
+          // ERR_UPDATER_LATEST_VERSION_NOT_FOUND などのエラーは無視
+          if (error?.code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND") {
+            logger.debug("No update available (latest version not found)");
+          } else {
+            logger.debug(
+              { error },
+              "Standard updater check failed (non-fatal)"
+            );
+          }
+        });
         return;
       }
-      logger.warn({ status: response.status }, "Failed to fetch release info");
+      // その他のHTTPエラーも無視（非致命的）
+      logger.debug(
+        { status: response.status },
+        "Failed to fetch release info (non-fatal)"
+      );
       return;
     }
 
@@ -639,12 +657,23 @@ async function checkForUpdatesCustom() {
       }
     }
   } catch (error) {
-    logger.error(
+    // カスタムアップデートチェックのエラーは非致命的（ネットワークエラーなど）
+    logger.debug(
       { error },
-      "Custom update check failed, falling back to standard updater"
+      "Custom update check failed, falling back to standard updater (non-fatal)"
     );
-    // エラーの場合は標準のelectron-updaterを使用
-    autoUpdater.checkForUpdates();
+    // エラーの場合は標準のelectron-updaterを使用（エラーは無視）
+    autoUpdater.checkForUpdates().catch((updateError) => {
+      // ERR_UPDATER_LATEST_VERSION_NOT_FOUND などのエラーは無視
+      if (updateError?.code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND") {
+        logger.debug("No update available (latest version not found)");
+      } else {
+        logger.debug(
+          { error: updateError },
+          "Standard updater check failed (non-fatal)"
+        );
+      }
+    });
   }
 }
 
