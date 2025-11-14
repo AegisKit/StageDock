@@ -1,4 +1,8 @@
 ﻿import { app, BrowserWindow, ipcMain, nativeTheme, shell } from "electron";
+import type {
+  OnBeforeSendHeadersListenerDetails,
+  Session,
+} from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -115,6 +119,167 @@ function loadEnvFromFile(): void {
 
 loadEnvFromFile();
 
+const STREAMING_URL_FILTERS = [
+  "*://*.youtube.com/*",
+  "*://youtube.com/*",
+  "*://*.youtube-nocookie.com/*",
+  "*://youtube-nocookie.com/*",
+  "*://youtu.be/*",
+  "*://*.googlevideo.com/*",
+  "*://*.ytimg.com/*",
+  "*://*.ggpht.com/*",
+  "*://*.youtube.googleapis.com/*",
+  "*://*.youtubei.googleapis.com/*",
+  "*://*.x.com/*",
+  "*://x.com/*",
+  "*://*.twitter.com/*",
+  "*://twitter.com/*",
+  "*://*.twimg.com/*",
+] as const;
+
+type StreamingPolicy = {
+  referrer: string;
+  origin: string;
+  allowedDomains: ReadonlyArray<string>;
+};
+
+const YOUTUBE_POLICY: StreamingPolicy = {
+  referrer: "https://www.youtube.com/",
+  origin: "https://www.youtube.com",
+  allowedDomains: ["youtube.com"],
+};
+
+const YOUTUBE_NOCOOKIE_POLICY: StreamingPolicy = {
+  referrer: "https://www.youtube-nocookie.com/",
+  origin: "https://www.youtube-nocookie.com",
+  allowedDomains: ["youtube-nocookie.com", "youtube.com"],
+};
+
+const X_POLICY: StreamingPolicy = {
+  referrer: "https://x.com/",
+  origin: "https://x.com",
+  allowedDomains: ["x.com", "twitter.com"],
+};
+
+const patchedSessions = new WeakSet<Session>();
+
+function matchesDomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+function getHeaderValue(
+  headers: Record<string, string | string[] | undefined>,
+  key: string
+): string | undefined {
+  const value = headers[key];
+  if (!value) {
+    return undefined;
+  }
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function resolveStreamingPolicy(
+  details: OnBeforeSendHeadersListenerDetails
+): StreamingPolicy | null {
+  let hostname: string;
+  try {
+    hostname = new URL(details.url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+
+  const currentReferrer =
+    details.referrer ??
+    getHeaderValue(details.requestHeaders, "Referer") ??
+    undefined;
+  const preferNoCookie =
+    currentReferrer?.toLowerCase().includes("youtube-nocookie.com") ?? false;
+
+  if (matchesDomain(hostname, "youtube-nocookie.com")) {
+    return YOUTUBE_NOCOOKIE_POLICY;
+  }
+
+  if (matchesDomain(hostname, "youtube.com") || hostname === "youtu.be") {
+    return YOUTUBE_POLICY;
+  }
+
+  if (
+    matchesDomain(hostname, "googlevideo.com") ||
+    matchesDomain(hostname, "ytimg.com") ||
+    matchesDomain(hostname, "ggpht.com") ||
+    matchesDomain(hostname, "youtube.googleapis.com") ||
+    matchesDomain(hostname, "youtubei.googleapis.com")
+  ) {
+    if (preferNoCookie) {
+      return YOUTUBE_NOCOOKIE_POLICY;
+    }
+    return {
+      referrer: YOUTUBE_POLICY.referrer,
+      origin: YOUTUBE_POLICY.origin,
+      allowedDomains: Array.from(
+        new Set([
+          ...YOUTUBE_POLICY.allowedDomains,
+          ...YOUTUBE_NOCOOKIE_POLICY.allowedDomains,
+        ])
+      ),
+    };
+  }
+
+  if (
+    matchesDomain(hostname, "x.com") ||
+    matchesDomain(hostname, "twitter.com") ||
+    matchesDomain(hostname, "twimg.com")
+  ) {
+    return X_POLICY;
+  }
+
+  return null;
+}
+
+function ensureStreamingRequestHeaders(session: Session) {
+  if (patchedSessions.has(session)) {
+    return;
+  }
+
+  patchedSessions.add(session);
+
+  session.webRequest.onBeforeSendHeaders(
+    { urls: [...STREAMING_URL_FILTERS] },
+    (details, callback) => {
+      const policy = resolveStreamingPolicy(details);
+      if (!policy) {
+        callback({ requestHeaders: details.requestHeaders });
+        return;
+      }
+
+      const currentReferrer =
+        details.referrer ??
+        getHeaderValue(details.requestHeaders, "Referer") ??
+        undefined;
+
+      if (currentReferrer) {
+        try {
+          const refHost = new URL(currentReferrer).hostname.toLowerCase();
+          const allowed = policy.allowedDomains.some((domain) =>
+            matchesDomain(refHost, domain)
+          );
+          if (allowed) {
+            callback({ requestHeaders: details.requestHeaders });
+            return;
+          }
+        } catch {
+          // ignore invalid referrer and overwrite below
+        }
+      }
+
+      const requestHeaders = { ...details.requestHeaders };
+      requestHeaders.Referer = policy.referrer;
+      requestHeaders.Origin = policy.origin;
+      callback({ requestHeaders });
+    }
+  );
+}
+
 const isDevelopment = !app.isPackaged;
 // CommonJSでは__filenameと__dirnameは自動的に利用可能
 function resolvePreloadPath() {
@@ -170,6 +335,8 @@ async function createMultiviewWindow(urls: string[], layout: string) {
   });
 
   multiviewWindow.setTitle("StageDock Multi-view");
+
+  ensureStreamingRequestHeaders(multiviewWindow.webContents.session);
 
   // Content Security Policyを無効化
   multiviewWindow.webContents.session.webRequest.onHeadersReceived(
@@ -261,6 +428,8 @@ async function createWindow() {
   });
   // ウィンドウタイトルを設定
   mainWindow.setTitle("StageDock");
+
+  ensureStreamingRequestHeaders(mainWindow.webContents.session);
 
   mainWindow.on("ready-to-show", () => {
     mainWindow?.show();
